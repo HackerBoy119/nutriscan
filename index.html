@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NutriScan AI - Diario de Comidas</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome para íconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- React y Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-950 text-white min-h-screen font-sans select-none">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const CLAVE_FIJA_OPCIONAL = ""; 
+    const MODELO_POR_DEFECTO = "gemini-3.8-flash";
+
+    const QUICK_FOODS = [
+      { name: "Pechuga de Pollo (150g)", calories: 248, protein: 46, carbs: 0, fat: 5, category: "Almuerzo" },
+      { name: "Arroz Blanco Cocido (150g)", calories: 195, protein: 4, carbs: 42, fat: 0.4, category: "Almuerzo" },
+      { name: "2 Huevos Revueltos", calories: 182, protein: 12, carbs: 2, fat: 14, category: "Desayuno" },
+      { name: "Palta / Aguacate (100g)", calories: 160, protein: 2, carbs: 9, fat: 15, category: "Desayuno" },
+      { name: "Pan Integral (2 rebanadas)", calories: 160, protein: 8, carbs: 28, fat: 2, category: "Desayuno" },
+      { name: "Lomo Saltado (Plato estándar)", calories: 680, protein: 38, carbs: 62, fat: 30, category: "Almuerzo" },
+      { name: "Ceviche de Pescado (Plato)", calories: 380, protein: 42, carbs: 35, fat: 7, category: "Almuerzo" },
+      { name: "Avena con Leche (1 taza)", calories: 260, protein: 11, carbs: 42, fat: 5, category: "Desayuno" },
+      { name: "Plátano de Seda (1 unidad)", calories: 105, protein: 1.3, carbs: 27, fat: 0.4, category: "Snacks" },
+      { name: "Lata de Atún en Agua", calories: 130, protein: 29, carbs: 0, fat: 1, category: "Cena" }
+    ];
+
+    function App() {
+      const [activeTab, setActiveTab] = useState("diario");
+      
+      const [apiKey, setApiKey] = useState(() => {
+        return CLAVE_FIJA_OPCIONAL || localStorage.getItem("nutriscan_apikey") || "";
+      });
+      const [modelName, setModelName] = useState(() => {
+        return localStorage.getItem("nutriscan_model") || MODELO_POR_DEFECTO;
+      });
+      const [showKeyModal, setShowKeyModal] = useState(false);
+
+      const [meals, setMeals] = useState(() => {
+        const saved = localStorage.getItem("nutriscan_meals");
+        return saved ? JSON.parse(saved) : [
+          { id: 1, name: "Huevo, pan integral, palta", category: "Desayuno", calories: 340, protein: 18, carbs: 30, fat: 16, time: "08:30" },
+          { id: 2, name: "Pechuga de pollo, arroz, ensalada", category: "Almuerzo", calories: 520, protein: 48, carbs: 55, fat: 11, time: "13:15" }
+        ];
+      });
+
+      const [goals, setGoals] = useState(() => {
+        const saved = localStorage.getItem("nutriscan_goals");
+        return saved ? JSON.parse(saved) : { calories: 2000, protein: 120, carbs: 220, fat: 65 };
+      });
+
+      const [isScanning, setIsScanning] = useState(false);
+      const [scanResult, setScanResult] = useState(null);
+      const [errorMsg, setErrorMsg] = useState("");
+      const [selectedCategory, setSelectedCategory] = useState("Almuerzo");
+      const [textPrompt, setTextPrompt] = useState("");
+      const [searchQuery, setSearchQuery] = useState("");
+
+      const videoRef = useRef(null);
+      const canvasRef = useRef(null);
+      const [cameraActive, setCameraActive] = useState(false);
+
+      const [profile, setProfile] = useState({ weight: 70, height: 170, age: 22, gender: "male", activity: 1.55, objective: "maintain" });
+
+      useEffect(() => {
+        localStorage.setItem("nutriscan_meals", JSON.stringify(meals));
+      }, [meals]);
+
+      useEffect(() => {
+        localStorage.setItem("nutriscan_goals", JSON.stringify(goals));
+      }, [goals]);
+
+      const saveConfig = (newKey, newModel) => {
+        const trimmedKey = newKey.trim();
+        const trimmedModel = (newModel || MODELO_POR_DEFECTO).trim().replace(/^models\//, "");
+        setApiKey(trimmedKey);
+        setModelName(trimmedModel);
+        localStorage.setItem("nutriscan_apikey", trimmedKey);
+        localStorage.setItem("nutriscan_model", trimmedModel);
+        setShowKeyModal(false);
+        setErrorMsg("");
+      };
+
+      const totals = meals.reduce(
+        (acc, item) => ({
+          calories: acc.calories + Number(item.calories || 0),
+          protein: acc.protein + Number(item.protein || 0),
+          carbs: acc.carbs + Number(item.carbs || 0),
+          fat: acc.fat + Number(item.fat || 0),
+        }),
+        { calories: 0, protein: 0, carbs: 0, fat: 0 }
+      );
+
+      const startCamera = async () => {
+        setErrorMsg("");
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }
+          });
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            setCameraActive(true);
+          }
+        } catch (err) {
+          setErrorMsg("No se pudo acceder a la cámara. Asegúrate de estar en HTTPS o sube una foto desde tu galería.");
+        }
+      };
+
+      const stopCamera = () => {
+        if (videoRef.current && videoRef.current.srcObject) {
+          videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+          videoRef.current.srcObject = null;
+        }
+        setCameraActive(false);
+      };
+
+      useEffect(() => {
+        if (activeTab !== "camara") stopCamera();
+      }, [activeTab]);
+
+      const capturePhoto = () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        stopCamera();
+        analyzeImageWithGemini(dataUrl);
+      };
+
+      const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          analyzeImageWithGemini(reader.result);
+        };
+        reader.readAsDataURL(file);
+      };
+
+      // Función auxiliar para limpiar JSON si el modelo devuelve bloques markdown
+      const parseSafeJson = (rawText) => {
+        const cleaned = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+        return JSON.parse(cleaned);
+      };
+
+      // Llamada a la API de Gemini (Imagen) usando gemini-3.8-flash
+      const analyzeImageWithGemini = async (base64DataUrl) => {
+        if (!apiKey) {
+          setShowKeyModal(true);
+          setErrorMsg("Configura tu API Key de Gemini primero para analizar imágenes.");
+          return;
+        }
+
+        setIsScanning(true);
+        setErrorMsg("");
+        setScanResult(null);
+
+        try {
+          const base64String = base64DataUrl.split(",")[1];
+          const mimeType = base64DataUrl.substring(base64DataUrl.indexOf(":") + 1, base64DataUrl.indexOf(";"));
+
+          const prompt = `Analiza esta imagen de comida. Identifica el plato o los ingredientes visibles, estima su tamaño de porción aproximado y calcula sus valores nutricionales totales.
+Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
+{
+  "name": "Nombre descriptivo del plato en español",
+  "calories": 500,
+  "protein": 30,
+  "carbs": 45,
+  "fat": 20,
+  "details": "Breve desglose de los ingredientes estimados"
+}`;
+
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: prompt },
+                  { inlineData: { mimeType: mimeType, data: base64String } }
+                ]
+              }],
+              generationConfig: {
+                responseMimeType: "application/json"
+              }
+            })
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error?.message || "Error al conectar con Gemini API");
+          }
+
+          const rawText = data.candidates[0].content.parts[0].text;
+          const parsed = parseSafeJson(rawText);
+          setScanResult({ ...parsed, imagePreview: base64DataUrl });
+        } catch (err) {
+          setErrorMsg("Error al analizar: " + err.message);
+        } finally {
+          setIsScanning(false);
+        }
+      };
+
+      // Llamada a la API de Gemini (Texto) usando gemini-3.8-flash
+      const analyzeTextWithGemini = async () => {
+        if (!textPrompt.trim()) return;
+        if (!apiKey) {
+          setShowKeyModal(true);
+          setErrorMsg("Configura tu API Key de Gemini primero.");
+          return;
+        }
+
+        setIsScanning(true);
+        setErrorMsg("");
+
+        try {
+          const prompt = `Calcula las calorías y macronutrientes para la siguiente comida descrita por el usuario: "${textPrompt}".
+Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
+{
+  "name": "Nombre resumido del plato",
+  "calories": 500,
+  "protein": 30,
+  "carbs": 45,
+  "fat": 20,
+  "details": "Desglose breve"
+}`;
+
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: "application/json" }
+            })
+          });
+
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error?.message || "Error en la API");
+
+          const rawText = data.candidates[0].content.parts[0].text;
+          const parsed = parseSafeJson(rawText);
+          setScanResult(parsed);
+          setTextPrompt("");
+        } catch (err) {
+          setErrorMsg("Error al calcular: " + err.message);
+        } finally {
+          setIsScanning(false);
+        }
+      };
+
+      const addMeal = (foodItem, categoryOverride) => {
+        const now = new Date();
+        const timeStr = now.toTimeString().slice(0, 5);
+        const newMeal = {
+          id: Date.now(),
+          name: foodItem.name,
+          category: categoryOverride || foodItem.category || selectedCategory,
+          calories: Math.round(Number(foodItem.calories) || 0),
+          protein: Math.round(Number(foodItem.protein) || 0),
+          carbs: Math.round(Number(foodItem.carbs) || 0),
+          fat: Math.round(Number(foodItem.fat) || 0),
+          time: timeStr
+        };
+        setMeals([newMeal, ...meals]);
+        setScanResult(null);
+        setActiveTab("diario");
+      };
+
+      const deleteMeal = (id) => {
+        setMeals(meals.filter(m => m.id !== id));
+      };
+
+      const calculateAutoGoals = () => {
+        const { weight, height, age, gender, activity, objective } = profile;
+        let bmr = (10 * weight) + (6.25 * height) - (5 * age) + (gender === "male" ? 5 : -161);
+        let tdee = bmr * activity;
+        if (objective === "deficit") tdee -= 400;
+        if (objective === "bulk") tdee += 350;
+
+        const targetCals = Math.round(tdee);
+        const targetProtein = Math.round(weight * 2);
+        const targetFat = Math.round((targetCals * 0.25) / 9);
+        const targetCarbs = Math.round((targetCals - (targetProtein * 4) - (targetFat * 9)) / 4);
+
+        setGoals({
+          calories: targetCals,
+          protein: targetProtein,
+          carbs: targetCarbs,
+          fat: targetFat
+        });
+      };
+
+      const radius = 64;
+      const circumference = 2 * Math.PI * radius;
+      const calPercent = Math.min(totals.calories / (goals.calories || 1), 1);
+      const strokeDashoffset = circumference - calPercent * circumference;
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen bg-slate-900 flex flex-col justify-between shadow-2xl relative border-x border-slate-800">
+          
+          {/* ENCABEZADO */}
+          <header className="p-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/90 sticky top-0 z-20 backdrop-blur">
+            <div className="flex items-center gap-2">
+              <i className="fa-solid fa-bars text-slate-400 text-lg"></i>
+              <h1 className="font-bold tracking-wider text-sm uppercase text-slate-100">Diario de Comidas</h1>
+            </div>
+            <button
+              onClick={() => setShowKeyModal(true)}
+              className={`text-xs px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5 transition ${
+                apiKey ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" : "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
+              }`}
+            >
+              <i className="fa-solid fa-key"></i>
+              {apiKey ? "API Conectada" : "Configurar API Key"}
+            </button>
+          </header>
+
+          {/* CONTENIDO PRINCIPAL */}
+          <main className="flex-1 p-4 pb-24 overflow-y-auto space-y-5">
+            
+            {errorMsg && (
+              <div className="bg-red-500/20 border border-red-500/50 text-red-200 text-xs p-3 rounded-xl flex justify-between items-center">
+                <span><i className="fa-solid fa-triangle-exclamation mr-2"></i>{errorMsg}</span>
+                <button onClick={() => setErrorMsg("")} className="text-red-300 font-bold ml-2">✕</button>
+              </div>
+            )}
+
+            {/* VISTA 1: DIARIO */}
+            {activeTab === "diario" && (
+              <>
+                <div className="relative">
+                  <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                  <input
+                    type="text"
+                    placeholder="Buscar alimento o platillo..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-800/90 text-sm text-white rounded-2xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-400 border border-slate-700/60"
+                  />
+                </div>
+
+                {searchQuery && (
+                  <div className="bg-slate-800 rounded-2xl p-3 border border-slate-700 space-y-2">
+                    <p className="text-xs text-slate-400 font-medium">Resultados rápidos:</p>
+                    {QUICK_FOODS.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase())).map((food, idx) => (
+                      <div key={idx} className="flex justify-between items-center bg-slate-900/70 p-2.5 rounded-xl">
+                        <div>
+                          <p className="text-sm font-medium">{food.name}</p>
+                          <p className="text-xs text-slate-400">{food.calories} kcal • P:{food.protein}g C:{food.carbs}g G:{food.fat}g</p>
+                        </div>
+                        <button
+                          onClick={() => { addMeal(food); setSearchQuery(""); }}
+                          className="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs"
+                        >
+                          + Agregar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="bg-slate-800/60 border border-slate-800 rounded-3xl p-4 flex items-center justify-between gap-4 shadow-lg">
+                  <div className="relative flex items-center justify-center">
+                    <svg className="w-36 h-36 -rotate-90 transform">
+                      <circle cx="72" cy="72" r={radius} stroke="#1e293b" strokeWidth="12" fill="transparent" />
+                      <circle
+                        cx="72"
+                        cy="72"
+                        r={radius}
+                        stroke="url(#grad)"
+                        strokeWidth="12"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={strokeDashoffset}
+                        strokeLinecap="round"
+                        fill="transparent"
+                        className="transition-all duration-500"
+                      />
+                      <defs>
+                        <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#2dd4bf" />
+                          <stop offset="100%" stopColor="#10b981" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute text-center">
+                      <span className="text-xs text-slate-400 block">Calorías</span>
+                      <span className="text-2xl font-extrabold text-white">{totals.calories.toLocaleString()}</span>
+                      <span className="text-[11px] text-slate-400 block">/ {goals.calories.toLocaleString()} kcal</span>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 space-y-3.5">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="flex items-center gap-1.5 text-slate-300">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>Proteínas:
+                        </span>
+                        <span className="font-bold">{totals.protein}g <span className="text-slate-400 font-normal">/ {goals.protein}g</span></span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden">
+                        <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${Math.min((totals.protein / goals.protein) * 100, 100)}%` }}></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="flex items-center gap-1.5 text-slate-300">
+                          <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>Carbohidratos:
+                        </span>
+                        <span className="font-bold">{totals.carbs}g <span className="text-slate-400 font-normal">/ {goals.carbs}g</span></span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden">
+                        <div className="bg-orange-500 h-full rounded-full transition-all" style={{ width: `${Math.min((totals.carbs / goals.carbs) * 100, 100)}%` }}></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="flex items-center gap-1.5 text-slate-300">
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>Grasas:
+                        </span>
+                        <span className="font-bold">{totals.fat}g <span className="text-slate-400 font-normal">/ {goals.fat}g</span></span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden">
+                        <div className="bg-amber-400 h-full rounded-full transition-all" style={{ width: `${Math.min((totals.fat / goals.fat) * 100, 100)}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2.5">
+                    <h2 className="font-bold text-base">Comidas del Día</h2>
+                    <button
+                      onClick={() => { if(confirm("¿Reiniciar las comidas de hoy?")) setMeals([]); }}
+                      className="text-xs text-slate-400 hover:text-red-400"
+                    >
+                      Limpiar día
+                    </button>
+                  </div>
+
+                  {meals.length === 0 ? (
+                    <div className="bg-slate-800/40 border border-slate-800 rounded-2xl p-6 text-center text-slate-400 text-sm">
+                      Aún no has registrado comidas hoy. Usa el botón de abajo para escanear tu plato.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {meals.map((meal) => (
+                        <div key={meal.id} className="bg-slate-800/80 border border-slate-700/60 p-3.5 rounded-2xl flex flex-col justify-between relative group">
+                          <button
+                            onClick={() => deleteMeal(meal.id)}
+                            className="absolute top-2.5 right-2.5 text-slate-500 hover:text-red-400 text-xs"
+                            title="Eliminar"
+                          >
+                            ✕
+                          </button>
+                          <div>
+                            <span className="text-[10px] uppercase tracking-wider text-teal-400 font-bold">{meal.category}</span>
+                            <h3 className="font-bold text-sm leading-snug mt-0.5 line-clamp-2">{meal.name}</h3>
+                          </div>
+                          <div className="mt-3 pt-2 border-t border-slate-700/50">
+                            <p className="text-sm font-extrabold text-white">{meal.calories} kcal</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              P:{meal.protein}g • C:{meal.carbs}g • G:{meal.fat}g
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setActiveTab("camara")}
+                  className="w-full py-4 px-5 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold shadow-lg shadow-teal-500/20 flex items-center justify-center gap-3 transition transform active:scale-95"
+                >
+                  <i className="fa-solid fa-camera text-2xl"></i>
+                  <div className="text-left">
+                    <span className="block text-base leading-none">Escanear Comida con IA</span>
+                    <span className="block text-xs font-medium opacity-80 mt-0.5">Tomar foto o describir para calcular</span>
+                  </div>
+                </button>
+              </>
+            )}
+
+            {/* VISTA 2: CÁMARA E INTELIGENCIA ARTIFICIAL */}
+            {activeTab === "camara" && (
+              <div className="space-y-4">
+                <h2 className="font-bold text-lg flex items-center gap-2">
+                  <i className="fa-solid fa-wand-magic-sparkles text-teal-400"></i>
+                  Escáner Nutricional con IA
+                </h2>
+
+                <div className="flex gap-2">
+                  {["Desayuno", "Almuerzo", "Cena", "Snacks"].map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${
+                        selectedCategory === cat
+                          ? "bg-teal-500 text-slate-950 border-teal-400"
+                          : "bg-slate-800 text-slate-300 border-slate-700"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-4 text-center space-y-3">
+                  {cameraActive ? (
+                    <div className="space-y-3">
+                      <video ref={videoRef} autoPlay playsInline className="w-full h-64 object-cover rounded-2xl bg-black" />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={capturePhoto}
+                          className="flex-1 bg-teal-400 text-slate-950 font-bold py-3 rounded-xl"
+                        >
+                          <i className="fa-solid fa-camera mr-2"></i>Capturar Foto
+                        </button>
+                        <button
+                          onClick={stopCamera}
+                          className="bg-slate-700 text-white px-4 py-3 rounded-xl"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={startCamera}
+                        className="bg-slate-900 hover:bg-slate-800 border border-slate-700 p-5 rounded-2xl flex flex-col items-center gap-2 transition"
+                      >
+                        <i className="fa-solid fa-camera text-3xl text-teal-400"></i>
+                        <span className="text-xs font-bold">Usar Cámara</span>
+                      </button>
+
+                      <label className="bg-slate-900 hover:bg-slate-800 border border-slate-700 p-5 rounded-2xl flex flex-col items-center gap-2 cursor-pointer transition">
+                        <i className="fa-solid fa-image text-3xl text-cyan-400"></i>
+                        <span className="text-xs font-bold">Subir Foto / Cámara Celular</span>
+                        <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} className="hidden" />
+                      </label>
+                    </div>
+                  )}
+                  <canvas ref={canvasRef} className="hidden" />
+                </div>
+
+                <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-4 space-y-2.5">
+                  <label className="text-xs text-slate-300 font-semibold block">
+                    ¿No tienes foto? Describe tu comida y la IA calculará los macros:
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ej: 1 plato de lomo saltado"
+                      value={textPrompt}
+                      onChange={(e) => setTextPrompt(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && analyzeTextWithGemini()}
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-teal-400"
+                    />
+                    <button
+                      onClick={analyzeTextWithGemini}
+                      disabled={isScanning}
+                      className="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 rounded-xl text-xs"
+                    >
+                      Calcular
+                    </button>
+                  </div>
+                </div>
+
+                {isScanning && (
+                  <div className="bg-slate-800/90 border border-teal-500/40 rounded-2xl p-6 text-center space-y-2">
+                    <i className="fa-solid fa-spinner fa-spin text-3xl text-teal-400"></i>
+                    <p className="text-sm font-bold">Analizando nutrientes con {modelName}...</p>
+                    <p className="text-xs text-slate-400">Detectando ingredientes y estimando porciones</p>
+                  </div>
+                )}
+
+                {scanResult && (
+                  <div className="bg-slate-800 border-2 border-teal-500/60 rounded-3xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-teal-400 uppercase">Resultado IA (Editable)</span>
+                      <button onClick={() => setScanResult(null)} className="text-xs text-slate-400">Descartar</button>
+                    </div>
+
+                    {scanResult.imagePreview && (
+                      <img src={scanResult.imagePreview} alt="Plato" className="w-full h-36 object-cover rounded-xl" />
+                    )}
+
+                    <div>
+                      <label className="text-[11px] text-slate-400">Nombre del plato:</label>
+                      <input
+                        type="text"
+                        value={scanResult.name}
+                        onChange={(e) => setScanResult({ ...scanResult, name: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-bold mt-0.5"
+                      />
+                    </div>
+
+                    {scanResult.details && (
+                      <p className="text-xs text-slate-300 bg-slate-900/70 p-2.5 rounded-xl">{scanResult.details}</p>
+                    )}
+
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      <div className="bg-slate-900 p-2 rounded-xl">
+                        <span className="text-[10px] text-slate-400 block">Kcal</span>
+                        <input
+                          type="number"
+                          value={scanResult.calories}
+                          onChange={(e) => setScanResult({ ...scanResult, calories: e.target.value })}
+                          className="w-full bg-transparent text-center font-bold text-sm focus:outline-none"
+                        />
+                      </div>
+                      <div className="bg-slate-900 p-2 rounded-xl">
+                        <span className="text-[10px] text-blue-400 block">Prot (g)</span>
+                        <input
+                          type="number"
+                          value={scanResult.protein}
+                          onChange={(e) => setScanResult({ ...scanResult, protein: e.target.value })}
+                          className="w-full bg-transparent text-center font-bold text-sm focus:outline-none"
+                        />
+                      </div>
+                      <div className="bg-slate-900 p-2 rounded-xl">
+                        <span className="text-[10px] text-orange-400 block">Carbs (g)</span>
+                        <input
+                          type="number"
+                          value={scanResult.carbs}
+                          onChange={(e) => setScanResult({ ...scanResult, carbs: e.target.value })}
+                          className="w-full bg-transparent text-center font-bold text-sm focus:outline-none"
+                        />
+                      </div>
+                      <div className="bg-slate-900 p-2 rounded-xl">
+                        <span className="text-[10px] text-amber-400 block">Grasas (g)</span>
+                        <input
+                          type="number"
+                          value={scanResult.fat}
+                          onChange={(e) => setScanResult({ ...scanResult, fat: e.target.value })}
+                          className="w-full bg-transparent text-center font-bold text-sm focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => addMeal(scanResult)}
+                      className="w-full bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold py-3 rounded-xl text-sm transition"
+                    >
+                      + Guardar en {selectedCategory}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* VISTA 3: ESTADÍSTICAS */}
+            {activeTab === "estadisticas" && (
+              <div className="space-y-4">
+                <h2 className="font-bold text-lg">Distribución de Macronutrientes</h2>
+                <div className="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 space-y-3">
+                  <p className="text-xs text-slate-400">Calorías aportadas por cada macronutriente hoy:</p>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-blue-400 font-bold">Proteínas ({totals.protein}g × 4 kcal)</span>
+                      <span>{totals.protein * 4} kcal</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-orange-400 font-bold">Carbohidratos ({totals.carbs}g × 4 kcal)</span>
+                      <span>{totals.carbs * 4} kcal</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-amber-400 font-bold">Grasas ({totals.fat}g × 9 kcal)</span>
+                      <span>{totals.fat * 9} kcal</span>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-700 flex justify-between text-sm font-bold">
+                    <span>Calorías Restantes Hoy:</span>
+                    <span className="text-teal-400">{Math.max(goals.calories - totals.calories, 0)} kcal</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* VISTA 4: PERFIL Y METAS */}
+            {activeTab === "perfil" && (
+              <div className="space-y-4">
+                <h2 className="font-bold text-lg">Configurar Metas Diarias</h2>
+                <div className="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="text-slate-400">Meta Calorías (kcal)</label>
+                      <input
+                        type="number"
+                        value={goals.calories}
+                        onChange={(e) => setGoals({ ...goals, calories: Number(e.target.value) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-blue-400">Proteínas (g)</label>
+                      <input
+                        type="number"
+                        value={goals.protein}
+                        onChange={(e) => setGoals({ ...goals, protein: Number(e.target.value) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-orange-400">Carbohidratos (g)</label>
+                      <input
+                        type="number"
+                        value={goals.carbs}
+                        onChange={(e) => setGoals({ ...goals, carbs: Number(e.target.value) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-amber-400">Grasas (g)</label>
+                      <input
+                        type="number"
+                        value={goals.fat}
+                        onChange={(e) => setGoals({ ...goals, fat: Number(e.target.value) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 space-y-3">
+                  <h3 className="font-bold text-sm text-teal-400">Calculadora Automática (TDEE)</h3>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <label className="text-slate-400">Peso (kg)</label>
+                      <input type="number" value={profile.weight} onChange={e => setProfile({...profile, weight: Number(e.target.value)})} className="w-full bg-slate-900 rounded-lg p-2 mt-1" />
+                    </div>
+                    <div>
+                      <label className="text-slate-400">Altura (cm)</label>
+                      <input type="number" value={profile.height} onChange={e => setProfile({...profile, height: Number(e.target.value)})} className="w-full bg-slate-900 rounded-lg p-2 mt-1" />
+                    </div>
+                    <div>
+                      <label className="text-slate-400">Edad</label>
+                      <input type="number" value={profile.age} onChange={e => setProfile({...profile, age: Number(e.target.value)})} className="w-full bg-slate-900 rounded-lg p-2 mt-1" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <select value={profile.objective} onChange={e => setProfile({...profile, objective: e.target.value})} className="bg-slate-900 rounded-lg p-2">
+                      <option value="deficit">Perder Grasa (-400 kcal)</option>
+                      <option value="maintain">Mantener Peso</option>
+                      <option value="bulk">Ganar Masa (+350 kcal)</option>
+                    </select>
+                    <button onClick={calculateAutoGoals} className="bg-teal-500 text-slate-950 font-bold rounded-lg p-2">
+                      Calcular Mis Macros
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </main>
+
+          {/* MODAL PARA CONFIGURAR API KEY Y MODELO */}
+          {showKeyModal && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-slate-900 border border-slate-700 rounded-3xl p-5 max-w-sm w-full space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-base flex items-center gap-2">
+                    <i className="fa-solid fa-key text-teal-400"></i>
+                    Configuración de Gemini API
+                  </h3>
+                  <button onClick={() => setShowKeyModal(false)} className="text-slate-400">✕</button>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-400 font-semibold">API Key (Google AI Studio):</label>
+                  <input
+                    type="password"
+                    placeholder="AIzaSy..."
+                    defaultValue={apiKey}
+                    id="apikey-input"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-400"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-400 font-semibold">Modelo de IA:</label>
+                  <input
+                    type="text"
+                    defaultValue={modelName}
+                    id="model-input"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-teal-300 font-mono focus:outline-none focus:border-teal-400"
+                  />
+                  <p className="text-[11px] text-slate-500">Por defecto: <code>gemini-3.8-flash</code></p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => saveConfig(
+                      document.getElementById("apikey-input").value,
+                      document.getElementById("model-input").value
+                    )}
+                    className="flex-1 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs"
+                  >
+                    Guardar Configuración
+                  </button>
+                  <button
+                    onClick={() => saveConfig("", MODELO_POR_DEFECTO)}
+                    className="bg-slate-800 text-red-400 px-3 py-2.5 rounded-xl text-xs"
+                  >
+                    Borrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BARRA DE NAVEGACIÓN INFERIOR */}
+          <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-900/95 backdrop-blur border-t border-slate-800 px-6 py-2.5 flex justify-between items-center z-30">
+            <button onClick={() => setActiveTab("diario")} className={`flex flex-col items-center gap-1 text-xs ${activeTab === "diario" ? "text-teal-400 font-bold" : "text-slate-400"}`}>
+              <i className="fa-solid fa-book-medical text-lg"></i>
+              <span>Diario</span>
+            </button>
+            <button onClick={() => setActiveTab("camara")} className={`flex flex-col items-center gap-1 text-xs ${activeTab === "camara" ? "text-teal-400 font-bold" : "text-slate-400"}`}>
+              <div className="w-12 h-12 -mt-6 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-400 text-slate-950 flex items-center justify-center shadow-lg shadow-teal-500/30 border-4 border-slate-900">
+                <i className="fa-solid fa-camera text-xl"></i>
+              </div>
+              <span>Cámara</span>
+            </button>
+            <button onClick={() => setActiveTab("estadisticas")} className={`flex flex-col items-center gap-1 text-xs ${activeTab === "estadisticas" ? "text-teal-400 font-bold" : "text-slate-400"}`}>
+              <i className="fa-solid fa-chart-simple text-lg"></i>
+              <span>Estadísticas</span>
+            </button>
+            <button onClick={() => setActiveTab("perfil")} className={`flex flex-col items-center gap-1 text-xs ${activeTab === "perfil" ? "text-teal-400 font-bold" : "text-slate-400"}`}>
+              <i className="fa-solid fa-user text-lg"></i>
+              <span>Perfil</span>
+            </button>
+          </nav>
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
