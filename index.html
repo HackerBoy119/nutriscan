@@ -17,23 +17,243 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+    const { useState, useEffect, useRef, useMemo } = React;
 
-    // Dejar vacío para que GitHub no bloquee la subida. La clave se ingresa en el botón "Configurar API Key" de la web.
     const CLAVE_FIJA_OPCIONAL = ""; 
     const MODELO_POR_DEFECTO = "gemini-3.8-flash";
 
-    const QUICK_FOODS = [
-      { name: "Pechuga de Pollo (150g)", calories: 248, protein: 46, carbs: 0, fat: 5, category: "Almuerzo" },
-      { name: "Arroz Blanco Cocido (150g)", calories: 195, protein: 4, carbs: 42, fat: 0.4, category: "Almuerzo" },
-      { name: "2 Huevos Revueltos", calories: 182, protein: 12, carbs: 2, fat: 14, category: "Desayuno" },
-      { name: "Palta / Aguacate (100g)", calories: 160, protein: 2, carbs: 9, fat: 15, category: "Desayuno" },
-      { name: "Pan Integral (2 rebanadas)", calories: 160, protein: 8, carbs: 28, fat: 2, category: "Desayuno" },
-      { name: "Lomo Saltado (Plato estándar)", calories: 680, protein: 38, carbs: 62, fat: 30, category: "Almuerzo" },
-      { name: "Ceviche de Pescado (Plato)", calories: 380, protein: 42, carbs: 35, fat: 7, category: "Almuerzo" },
-      { name: "Avena con Leche (1 taza)", calories: 260, protein: 11, carbs: 42, fat: 5, category: "Desayuno" },
-      { name: "Plátano de Seda (1 unidad)", calories: 105, protein: 1.3, carbs: 27, fat: 0.4, category: "Snacks" },
-      { name: "Lata de Atún en Agua", calories: 130, protein: 29, carbs: 0, fat: 1, category: "Cena" }
+    // Base de datos extendida con frutas, verduras, proteínas, cereales y platos típicos por unidad/porción
+    const FOOD_DATABASE = [
+      // FRUTAS (Valores por 1 unidad estándar o porción común)
+      { name: "Plátano / Banana (1 unidad mediana ~120g)", group: "Frutas", calories: 105, protein: 1.3, carbs: 27, fat: 0.4, category: "Snacks" },
+      { name: "Manzana (1 unidad mediana ~180g)", group: "Frutas", calories: 95, protein: 0.5, carbs: 25, fat: 0.3, category: "Snacks" },
+      { name: "Naranja (1 unidad mediana ~130g)", group: "Frutas", calories: 62, protein: 1.2, carbs: 15, fat: 0.2, category: "Snacks" },
+      { name: "Mandarina (1 unidad ~90g)", group: "Frutas", calories: 47, protein: 0.7, carbs: 12, fat: 0.3, category: "Snacks" },
+      { name: "Pera (1 unidad mediana ~180g)", group: "Frutas", calories: 101, protein: 0.6, carbs: 27, fat: 0.2, category: "Snacks" },
+      { name: "Durazno / Melocotón (1 unidad ~150g)", group: "Frutas", calories: 59, protein: 1.4, carbs: 14, fat: 0.4, category: "Snacks" },
+      { name: "Kiwi (1 unidad ~75g)", group: "Frutas", calories: 42, protein: 0.8, carbs: 10, fat: 0.4, category: "Snacks" },
+      { name: "Mango entero (1 unidad mediana ~300g)", group: "Frutas", calories: 200, protein: 2.8, carbs: 50, fat: 1.2, category: "Snacks" },
+      { name: "Fresas / Frutillas (1 taza entera ~150g)", group: "Frutas", calories: 48, protein: 1.0, carbs: 12, fat: 0.5, category: "Snacks" },
+      { name: "Arándanos (1 taza ~150g)", group: "Frutas", calories: 84, protein: 1.1, carbs: 21, fat: 0.5, category: "Snacks" },
+      { name: "Palta / Aguacate entera (1 unidad ~150g pulpa)", group: "Frutas", calories: 240, protein: 3.0, carbs: 12, fat: 22, category: "Desayuno" },
+      { name: "Media Palta / Aguacate (1/2 unidad ~75g)", group: "Frutas", calories: 120, protein: 1.5, carbs: 6, fat: 11, category: "Desayuno" },
+      { name: "Sandía (1 rodaja gruesa ~250g)", group: "Frutas", calories: 75, protein: 1.5, carbs: 19, fat: 0.4, category: "Snacks" },
+      { name: "Piña / Ananá (1 rodaja gruesa ~150g)", group: "Frutas", calories: 75, protein: 0.8, carbs: 20, fat: 0.2, category: "Snacks" },
+      { name: "Limón (1 unidad mediana ~60g)", group: "Frutas", calories: 17, protein: 0.6, carbs: 5.4, fat: 0.2, category: "Snacks" },
+      { name: "Papaya picada (1 taza ~150g)", group: "Frutas", calories: 65, protein: 0.9, carbs: 16, fat: 0.4, category: "Desayuno" },
+      { name: "Uvas (1 racimo pequeño / 15 uvas)", group: "Frutas", calories: 60, protein: 0.6, carbs: 16, fat: 0.2, category: "Snacks" },
+
+      // VERDURAS Y HORTALIZAS (Valores por 1 unidad o porción de taza)
+      { name: "Tomate (1 unidad mediana ~120g)", group: "Verduras", calories: 22, protein: 1.1, carbs: 4.8, fat: 0.2, category: "Almuerzo" },
+      { name: "Zanahoria (1 unidad mediana ~60g)", group: "Verduras", calories: 25, protein: 0.6, carbs: 6.0, fat: 0.1, category: "Snacks" },
+      { name: "Pepino entero (1 unidad mediana ~200g)", group: "Verduras", calories: 30, protein: 1.3, carbs: 7.0, fat: 0.2, category: "Almuerzo" },
+      { name: "Cebolla (1 unidad mediana ~110g)", group: "Verduras", calories: 44, protein: 1.2, carbs: 10.0, fat: 0.1, category: "Almuerzo" },
+      { name: "Pimiento / Morro (1 unidad mediana ~120g)", group: "Verduras", calories: 30, protein: 1.2, carbs: 7.0, fat: 0.3, category: "Almuerzo" },
+      { name: "Diente de Ajo (1 unidad)", group: "Verduras", calories: 4, protein: 0.2, carbs: 1.0, fat: 0.0, category: "Almuerzo" },
+      { name: "Tallo de Apio (1 tallo entero)", group: "Verduras", calories: 10, protein: 0.5, carbs: 2.0, fat: 0.1, category: "Snacks" },
+      { name: "Papa / Patata cocida (1 unidad mediana ~150g)", group: "Verduras", calories: 130, protein: 3.0, carbs: 30.0, fat: 0.2, category: "Almuerzo" },
+      { name: "Camote / Batata (1 unidad mediana ~130g)", group: "Verduras", calories: 112, protein: 2.0, carbs: 26.0, fat: 0.1, category: "Almuerzo" },
+      { name: "Choclo / Mazorca de maíz entera (1 unidad)", group: "Verduras", calories: 125, protein: 4.5, carbs: 27.0, fat: 1.8, category: "Almuerzo" },
+      { name: "Brócoli cocido (1 taza ~150g)", group: "Verduras", calories: 52, protein: 3.7, carbs: 11.0, fat: 0.6, category: "Almuerzo" },
+      { name: "Espinaca cruda (1 taza llena ~40g)", group: "Verduras", calories: 9, protein: 1.1, carbs: 1.4, fat: 0.1, category: "Almuerzo" },
+      { name: "Lechuga picada (1 taza colmada ~50g)", group: "Verduras", calories: 8, protein: 0.6, carbs: 1.5, fat: 0.1, category: "Almuerzo" },
+      { name: "Zapallo / Calabaza cocida (100g)", group: "Verduras", calories: 26, protein: 1.0, carbs: 6.5, fat: 0.1, category: "Almuerzo" },
+      { name: "Espárragos (5 unidades medianas)", group: "Verduras", calories: 20, protein: 2.2, carbs: 3.8, fat: 0.2, category: "Cena" },
+
+      // PROTEÍNAS Y LÁCTEOS (Por unidad / porción)
+      { name: "Huevo cocido / pasado (1 unidad grande ~50g)", group: "Proteínas", calories: 74, protein: 6.3, carbs: 0.4, fat: 5.0, category: "Desayuno" },
+      { name: "Clara de Huevo (1 unidad)", group: "Proteínas", calories: 17, protein: 3.6, carbs: 0.2, fat: 0.1, category: "Desayuno" },
+      { name: "2 Huevos Revueltos", group: "Proteínas", calories: 182, protein: 12, carbs: 2, fat: 14, category: "Desayuno" },
+      { name: "Pechuga de Pollo a la plancha (150g)", group: "Proteínas", calories: 248, protein: 46, carbs: 0, fat: 5, category: "Almuerzo" },
+      { name: "Lata de Atún en Agua (1 lata escurrida ~120g)", group: "Proteínas", calories: 130, protein: 29, carbs: 0, fat: 1, category: "Cena" },
+      { name: "Filete de Pescado blanco (150g)", group: "Proteínas", calories: 140, protein: 30, carbs: 0, fat: 1.5, category: "Almuerzo" },
+      { name: "Bife de Carne de Res magra (150g)", group: "Proteínas", calories: 270, protein: 39, carbs: 0, fat: 12, category: "Almuerzo" },
+      { name: "Vaso de Leche Entera (250ml)", group: "Lácteos", calories: 150, protein: 8, carbs: 12, fat: 8, category: "Desayuno" },
+      { name: "Vaso de Leche Descremada (250ml)", group: "Lácteos", calories: 90, protein: 8.5, carbs: 12, fat: 0.5, category: "Desayuno" },
+      { name: "Yogur Griego Natural (1 pote 150g)", group: "Lácteos", calories: 100, protein: 15, carbs: 5, fat: 2, category: "Desayuno" },
+      { name: "Queso Fresco / Panela (1 rebanada ~30g)", group: "Lácteos", calories: 75, protein: 6, carbs: 1, fat: 5.5, category: "Desayuno" },
+      { name: "Scoop de Proteína Whey (1 medida 30g)", group: "Proteínas", calories: 120, protein: 24, carbs: 2, fat: 1.5, category: "Snacks" },
+
+      // CEREALES, LEGUMBRES Y OTROS
+      { name: "Pan Integral (1 rebanada ~30g)", group: "Cereales", calories: 80, protein: 4, carbs: 14, fat: 1, category: "Desayuno" },
+      { name: "Pan Integral (2 rebanadas)", group: "Cereales", calories: 160, protein: 8, carbs: 28, fat: 2, category: "Desayuno" },
+      { name: "Pan Francés / Blanco (1 unidad ~50g)", group: "Cereales", calories: 140, protein: 4.5, carbs: 28, fat: 1, category: "Desayuno" },
+      { name: "Avena en hojuelas (1/2 taza seca ~40g)", group: "Cereales", calories: 150, protein: 5, carbs: 27, fat: 2.5, category: "Desayuno" },
+      { name: "Arroz Blanco Cocido (1 taza / 150g)", group: "Cereales", calories: 195, protein: 4, carbs: 42, fat: 0.4, category: "Almuerzo" },
+      { name: "Arroz Integral Cocido (1 taza / 150g)", group: "Cereales", calories: 165, protein: 3.5, carbs: 35, fat: 1.3, category: "Almuerzo" },
+      { name: "Lentejas cocidas (1 taza ~180g)", group: "Legumbres", calories: 210, protein: 16, carbs: 36, fat: 0.8, category: "Almuerzo" },
+      { name: "Frijoles / Porotos cocidos (1 taza ~180g)", group: "Legumbres", calories: 220, protein: 15, carbs: 40, fat: 0.9, category: "Almuerzo" },
+      { name: "Fideos / Pasta cocida (1 taza ~140g)", group: "Cereales", calories: 210, protein: 7, carbs: 42, fat: 1.2, category: "Almuerzo" },
+      { name: "Aceite de Oliva (1 cucharada sopera 15ml)", group: "Grasas", calories: 120, protein: 0, carbs: 0, fat: 14, category: "Almuerzo" },
+      { name: "Puñado de Nueces o Almendras (~30g)", group: "Frutos Secos", calories: 180, protein: 6, carbs: 6, fat: 16, category: "Snacks" },
+
+      // PLATOS PREPARADOS
+      { name: "Lomo Saltado (Plato estándar)", group: "Platos", calories: 680, protein: 38, carbs: 62, fat: 30, category: "Almuerzo" },
+      { name: "Ceviche de Pescado (Plato)", group: "Platos", calories: 380, protein: 42, carbs: 35, fat: 7, category: "Almuerzo" },
+      { name: "Arroz con Pollo (Plato casero)", group: "Platos", calories: 590, protein: 35, carbs: 70, fat: 18, category: "Almuerzo" }
+    ];
+
+    // 1. Ejercicios y Deportes Específicos (Con factor metabólico por disciplina)
+    const EXERCISE_LEVELS = [
+      {
+        id: "none",
+        label: "Ninguno (Sin deporte ni ejercicio regular)",
+        short: "Sin deporte",
+        factor: 0.0,
+        desc: "Poco o ningún deporte o ejercicio programado en la semana."
+      },
+      {
+        id: "gym",
+        label: "🏋️ Gimnasio / Pesas / Musculación",
+        short: "Gimnasio / Pesas",
+        factor: 0.25,
+        desc: "Entrenamiento de fuerza, hipertrofia o levantamiento de pesas en sala de musculación."
+      },
+      {
+        id: "running",
+        label: "🏃 Running / Trote / Carrera al aire libre",
+        short: "Running / Trote",
+        factor: 0.32,
+        desc: "Carrera continua en asfalto, pista o trotadora, cardio aeróbico y atletismo."
+      },
+      {
+        id: "football",
+        label: "⚽ Fútbol / Futsal / Fútbol 7",
+        short: "Fútbol / Futsal",
+        factor: 0.30,
+        desc: "Partidos y entrenamientos con sprints, cambios de ritmo y esfuerzo aeróbico/anaeróbico."
+      },
+      {
+        id: "crossfit",
+        label: "🔥 CrossFit / HIIT / Entrenamiento Funcional",
+        short: "CrossFit / HIIT",
+        factor: 0.35,
+        desc: "Circuitos de alta intensidad, levantamientos olímpicos, intervalos metabólicos y WODs."
+      },
+      {
+        id: "cycling",
+        label: "🚴 Ciclismo / Bicicleta / Spinning",
+        short: "Ciclismo / Bici",
+        factor: 0.28,
+        desc: "Ruta en bicicleta, spinning estático en gimnasio o ciclismo de montaña (MTB)."
+      },
+      {
+        id: "swimming",
+        label: "🏊 Natación",
+        short: "Natación",
+        factor: 0.28,
+        desc: "Nado continuo en piscina (crol, braza, espalda o mariposa), cardio completo de bajo impacto."
+      },
+      {
+        id: "combat",
+        label: "🥊 Boxeo / Artes Marciales / Muay Thai / MMA",
+        short: "Boxeo / Contacto",
+        factor: 0.35,
+        desc: "Combate, sparring, rounds de saco, jiu-jitsu o artes marciales de alta demanda calórica."
+      },
+      {
+        id: "calisthenics",
+        label: "🤸 Calistenia / Barras / Street Workout",
+        short: "Calistenia",
+        factor: 0.25,
+        desc: "Dominadas, fondos, flexiones y control acrobático con el propio peso corporal."
+      },
+      {
+        id: "racket",
+        label: "🎾 Pádel / Tenis / Frontón",
+        short: "Pádel / Tenis",
+        factor: 0.26,
+        desc: "Deportes de raqueta con desplazamientos rápidos, cambios de dirección y sprints continuos."
+      },
+      {
+        id: "basketball",
+        label: "🏀 Básquetbol / Baloncesto",
+        short: "Básquetbol",
+        factor: 0.28,
+        desc: "Juego continuo con saltos, rebotes y transiciones rápidas de cancha a cancha."
+      },
+      {
+        id: "volleyball",
+        label: "🏐 Vóleibol / Vóley Playa",
+        short: "Vóleibol",
+        factor: 0.22,
+        desc: "Saltos explosivos, remates, bloqueos y desplazamientos dinámicos."
+      },
+      {
+        id: "walking",
+        label: "🥾 Caminata Rápida / Senderismo / Trekking",
+        short: "Caminata / Trekking",
+        factor: 0.18,
+        desc: "Marcha activa a paso constante (>5 km/h) o senderismo con desniveles en montaña."
+      },
+      {
+        id: "dance",
+        label: "💃 Baile / Zumba / Danza Aeróbica",
+        short: "Baile / Zumba",
+        factor: 0.22,
+        desc: "Sesiones de baile, zumba, ritmos latinos o danza coreográfica continua."
+      },
+      {
+        id: "yoga",
+        label: "🧘 Yoga / Pilates / Estiramiento Funcional",
+        short: "Yoga / Pilates",
+        factor: 0.12,
+        desc: "Fuerza isométrica, control postural, flexibilidad y tonificación profunda de bajo impacto."
+      },
+      {
+        id: "multisport",
+        label: "🎽 Deportes Mixtos / Multideporte Variado",
+        short: "Deportes Mixtos",
+        factor: 0.28,
+        desc: "Combinación de varios deportes en la semana (ej. pesas + fútbol o running)."
+      },
+      {
+        id: "athlete",
+        label: "🥇 Atleta Profesional / Alto Rendimiento (Doble turno)",
+        short: "Atleta Élite",
+        factor: 0.48,
+        desc: "Deportista de competición federado, entrenamientos diarios intensos o doble turno."
+      }
+    ];
+
+    // Frecuencias semanales de entrenamiento
+    const FREQUENCIES = [
+      { days: 1, label: "1 a 2 días", mult: 0.6, text: "1 a 2 días/semana" },
+      { days: 3, label: "3 a 4 días", mult: 1.0, text: "3 a 4 días/semana" },
+      { days: 5, label: "5 a 6 días", mult: 1.3, text: "5 a 6 días/semana" },
+      { days: 7, label: "Diario (7d)", mult: 1.5, text: "Todos los días (7d)" }
+    ];
+
+    // 2. Nivel de Actividad Física (Cotidiana / Ocupacional / Pasos diarios)
+    const DAILY_ACTIVITY_LEVELS = [
+      {
+        id: "sedentary",
+        label: "Sedentario (Oficina / Mayormente sentado)",
+        short: "<4,000 pasos / Sentado",
+        baseFactor: 1.2,
+        desc: "Trabajo de escritorio, estudio o computador la mayor parte del día, menos de 4,000 pasos diarios."
+      },
+      {
+        id: "light",
+        label: "Ligeramente Activo (De pie a ratos / Paseos regulares)",
+        short: "4,000 a 7,000 pasos",
+        baseFactor: 1.3,
+        desc: "Pasa tiempo de pie o caminando a ratos en casa/oficina, quehaceres cotidianos y desplazamientos."
+      },
+      {
+        id: "moderate",
+        label: "Moderadamente Activo (De pie o caminando continuo)",
+        short: "7,000 a 11,000 pasos",
+        baseFactor: 1.4,
+        desc: "Trabajo activo donde se camina o está de pie constantemente (mesero, ventas, docencia, enfermería)."
+      },
+      {
+        id: "heavy",
+        label: "Muy Activo (Trabajo físico pesado o continuo)",
+        short: ">12,000 pasos / Físico pesado",
+        baseFactor: 1.5,
+        desc: "Trabajo manual pesado y exigente (construcción, almacén y carga, agricultura, reparto en bici)."
+      }
     ];
 
     function App() {
@@ -50,7 +270,7 @@
       const [meals, setMeals] = useState(() => {
         const saved = localStorage.getItem("nutriscan_meals");
         return saved ? JSON.parse(saved) : [
-          { id: 1, name: "Huevo, pan integral, palta", category: "Desayuno", calories: 340, protein: 18, carbs: 30, fat: 16, time: "08:30" },
+          { id: 1, name: "2 Huevos, pan integral, 1/2 palta", category: "Desayuno", calories: 340, protein: 18, carbs: 30, fat: 16, time: "08:30" },
           { id: 2, name: "Pechuga de pollo, arroz, ensalada", category: "Almuerzo", calories: 520, protein: 48, carbs: 55, fat: 11, time: "13:15" }
         ];
       });
@@ -60,6 +280,48 @@
         return saved ? JSON.parse(saved) : { calories: 2000, protein: 120, carbs: 220, fat: 65 };
       });
 
+      // Perfil con género, deporte/ejercicio y actividad física seleccionables por separado
+      const [profile, setProfile] = useState(() => {
+        const defaultProfile = {
+          gender: "male",
+          age: 22,
+          weight: 70,
+          height: 170,
+          exercise: "gym",
+          exerciseDays: 3,
+          dailyActivity: "light",
+          activity: 1.55,
+          objective: "maintain",
+          weeklyLossKg: 0.5
+        };
+        const saved = localStorage.getItem("nutriscan_profile");
+        if (!saved) return defaultProfile;
+        try {
+          const parsed = JSON.parse(saved);
+          let ex = parsed.exercise;
+          if (ex === "moderate") ex = "gym";
+          else if (ex === "light") ex = "walking";
+          else if (ex === "intense") ex = "crossfit";
+          else if (!ex) ex = "gym";
+
+          let days = Number(parsed.exerciseDays) || 3;
+          let daily = parsed.dailyActivity || "light";
+          let weeklyLoss = parsed.weeklyLossKg !== undefined ? (parsed.weeklyLossKg === "" ? "" : Number(parsed.weeklyLossKg)) : 0.5;
+          if (weeklyLoss !== "" && isNaN(weeklyLoss)) weeklyLoss = 0.5;
+
+          return {
+            ...defaultProfile,
+            ...parsed,
+            exercise: ex,
+            exerciseDays: days,
+            dailyActivity: daily,
+            weeklyLossKg: weeklyLoss
+          };
+        } catch (e) {
+          return defaultProfile;
+        }
+      });
+
       const [isScanning, setIsScanning] = useState(false);
       const [statusText, setStatusText] = useState("Analizando nutrientes con IA...");
       const [scanResult, setScanResult] = useState(null);
@@ -67,12 +329,11 @@
       const [selectedCategory, setSelectedCategory] = useState("Almuerzo");
       const [textPrompt, setTextPrompt] = useState("");
       const [searchQuery, setSearchQuery] = useState("");
+      const [selectedFoodGroup, setSelectedFoodGroup] = useState("Todos");
 
       const videoRef = useRef(null);
       const canvasRef = useRef(null);
       const [cameraActive, setCameraActive] = useState(false);
-
-      const [profile, setProfile] = useState({ weight: 70, height: 170, age: 22, gender: "male", activity: 1.55, objective: "maintain" });
 
       useEffect(() => {
         localStorage.setItem("nutriscan_meals", JSON.stringify(meals));
@@ -81,6 +342,10 @@
       useEffect(() => {
         localStorage.setItem("nutriscan_goals", JSON.stringify(goals));
       }, [goals]);
+
+      useEffect(() => {
+        localStorage.setItem("nutriscan_profile", JSON.stringify(profile));
+      }, [profile]);
 
       const saveConfig = (newKey, newModel) => {
         const trimmedKey = newKey.trim();
@@ -102,6 +367,110 @@
         }),
         { calories: 0, protein: 0, carbs: 0, fat: 0 }
       );
+
+      // CÁLCULO EN VIVO DE TMB Y TDEE
+      const metabolicData = useMemo(() => {
+        const w = Number(profile.weight) || 0;
+        const h = Number(profile.height) || 0;
+        const a = Number(profile.age) || 0;
+
+        const exItem = EXERCISE_LEVELS.find((e) => e.id === profile.exercise) || EXERCISE_LEVELS[1];
+        const actItem = DAILY_ACTIVITY_LEVELS.find((d) => d.id === profile.dailyActivity) || DAILY_ACTIVITY_LEVELS[1];
+        const freqObj = FREQUENCIES.find((f) => f.days === (profile.exerciseDays || 3)) || FREQUENCIES[1];
+
+        const sportFactor = exItem.id === "none" ? 0.0 : Number((exItem.factor * freqObj.mult).toFixed(3));
+        const act = Number((actItem.baseFactor + sportFactor).toFixed(3));
+
+        const lossTarget = profile.weeklyLossKg === "" ? 0.5 : (Number(profile.weeklyLossKg) || 0);
+        let deficitDaily = 0;
+
+        if (w <= 0 || h <= 0 || a <= 0) {
+          return { bmr: 0, tdee: 0, targetCals: 0, actMultiplier: act, sportFactor, deficitDaily: 0, weeklyLossKg: lossTarget };
+        }
+
+        // Fórmula Mifflin-St Jeor
+        let bmr = (10 * w) + (6.25 * h) - (5 * a) + (profile.gender === "male" ? 5 : -161);
+        let tdee = bmr * act;
+
+        let targetCals = tdee;
+        if (profile.objective === "deficit") {
+          // 1 kg de grasa equivale aprox a 7,700 kcal.
+          // Déficit diario = (pérdida_semanal_kg * 7700) / 7 = pérdida_semanal_kg * 1100 kcal/día
+          deficitDaily = Math.round(lossTarget * 1100);
+          targetCals -= deficitDaily;
+        } else if (profile.objective === "bulk") {
+          targetCals += 350;
+        }
+
+        return {
+          bmr: Math.round(bmr),
+          tdee: Math.round(tdee),
+          targetCals: Math.max(Math.round(targetCals), 1000),
+          deficitDaily,
+          weeklyLossKg: lossTarget,
+          actMultiplier: act,
+          sportFactor
+        };
+      }, [profile]);
+
+      const handleExerciseChange = (newExercise) => {
+        const ex = EXERCISE_LEVELS.find((e) => e.id === newExercise) || EXERCISE_LEVELS[1];
+        const daily = DAILY_ACTIVITY_LEVELS.find((d) => d.id === (profile.dailyActivity || "light")) || DAILY_ACTIVITY_LEVELS[1];
+        const freqObj = FREQUENCIES.find((f) => f.days === (profile.exerciseDays || 3)) || FREQUENCIES[1];
+        const sportFactor = ex.id === "none" ? 0.0 : Number((ex.factor * freqObj.mult).toFixed(3));
+        const combined = Number((daily.baseFactor + sportFactor).toFixed(3));
+        setProfile((prev) => ({
+          ...prev,
+          exercise: newExercise,
+          activity: combined
+        }));
+      };
+
+      const handleFrequencyChange = (newDays) => {
+        const ex = EXERCISE_LEVELS.find((e) => e.id === (profile.exercise || "gym")) || EXERCISE_LEVELS[1];
+        const daily = DAILY_ACTIVITY_LEVELS.find((d) => d.id === (profile.dailyActivity || "light")) || DAILY_ACTIVITY_LEVELS[1];
+        const freqObj = FREQUENCIES.find((f) => f.days === newDays) || FREQUENCIES[1];
+        const sportFactor = ex.id === "none" ? 0.0 : Number((ex.factor * freqObj.mult).toFixed(3));
+        const combined = Number((daily.baseFactor + sportFactor).toFixed(3));
+        setProfile((prev) => ({
+          ...prev,
+          exerciseDays: newDays,
+          activity: combined
+        }));
+      };
+
+      const handleDailyActivityChange = (newDailyActivity) => {
+        const ex = EXERCISE_LEVELS.find((e) => e.id === (profile.exercise || "gym")) || EXERCISE_LEVELS[1];
+        const daily = DAILY_ACTIVITY_LEVELS.find((d) => d.id === newDailyActivity) || DAILY_ACTIVITY_LEVELS[1];
+        const freqObj = FREQUENCIES.find((f) => f.days === (profile.exerciseDays || 3)) || FREQUENCIES[1];
+        const sportFactor = ex.id === "none" ? 0.0 : Number((ex.factor * freqObj.mult).toFixed(3));
+        const combined = Number((daily.baseFactor + sportFactor).toFixed(3));
+        setProfile((prev) => ({
+          ...prev,
+          dailyActivity: newDailyActivity,
+          activity: combined
+        }));
+      };
+
+      const selectedExercise = EXERCISE_LEVELS.find((e) => e.id === (profile.exercise || "gym")) || EXERCISE_LEVELS[1];
+      const selectedDailyActivity = DAILY_ACTIVITY_LEVELS.find((d) => d.id === (profile.dailyActivity || "light")) || DAILY_ACTIVITY_LEVELS[1];
+      const currentFrequency = FREQUENCIES.find((f) => f.days === (profile.exerciseDays || 3)) || FREQUENCIES[1];
+
+      const calculateAutoGoals = () => {
+        const { targetCals } = metabolicData;
+        const w = Number(profile.weight) || 70;
+
+        const targetProtein = Math.round(w * 2);
+        const targetFat = Math.round((targetCals * 0.25) / 9);
+        const targetCarbs = Math.max(Math.round((targetCals - (targetProtein * 4) - (targetFat * 9)) / 4), 0);
+
+        setGoals({
+          calories: targetCals,
+          protein: targetProtein,
+          carbs: targetCarbs,
+          fat: targetFat
+        });
+      };
 
       const startCamera = async () => {
         setErrorMsg("");
@@ -153,7 +522,6 @@
         reader.readAsDataURL(file);
       };
 
-      // Limpiador seguro de respuesta JSON
       const parseSafeJson = (rawText) => {
         const cleaned = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
         const firstBrace = cleaned.indexOf("{");
@@ -164,7 +532,6 @@
         return JSON.parse(cleaned);
       };
 
-      // Función con Auto-Reintento y Modelos de Respaldo ante Alta Demanda (Error 503 / 429)
       const callGeminiWithRetry = async (contentsPayload) => {
         const fallbackModels = [
           modelName,
@@ -173,7 +540,6 @@
           "gemini-3.8-pro",
           "gemini-2.0-flash"
         ];
-        // Eliminar duplicados manteniendo el orden
         const modelsToTry = [...new Set(fallbackModels)];
         let lastError = "";
 
@@ -210,7 +576,6 @@
               lastError = data.error?.message || "Error al procesar la respuesta de la IA";
               const lowerErr = lastError.toLowerCase();
 
-              // Si el servidor tiene alta demanda, espera un momento y reintenta
               if (
                 response.status === 503 ||
                 response.status === 429 ||
@@ -221,7 +586,6 @@
                 await new Promise((res) => setTimeout(res, 1500 * attempt));
                 continue;
               } else {
-                // Si el modelo no está disponible para la cuenta, salta inmediatamente al siguiente modelo de la lista
                 break;
               }
             } catch (networkErr) {
@@ -233,7 +597,6 @@
         throw new Error(lastError);
       };
 
-      // Analizar Imagen con Gemini
       const analyzeImageWithGemini = async (base64DataUrl) => {
         if (!apiKey) {
           setShowKeyModal(true);
@@ -275,7 +638,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
         }
       };
 
-      // Analizar Texto con Gemini
       const analyzeTextWithGemini = async () => {
         if (!textPrompt.trim()) return;
         if (!apiKey) {
@@ -332,25 +694,14 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
         setMeals(meals.filter(m => m.id !== id));
       };
 
-      const calculateAutoGoals = () => {
-        const { weight, height, age, gender, activity, objective } = profile;
-        let bmr = (10 * weight) + (6.25 * height) - (5 * age) + (gender === "male" ? 5 : -161);
-        let tdee = bmr * activity;
-        if (objective === "deficit") tdee -= 400;
-        if (objective === "bulk") tdee += 350;
-
-        const targetCals = Math.round(tdee);
-        const targetProtein = Math.round(weight * 2);
-        const targetFat = Math.round((targetCals * 0.25) / 9);
-        const targetCarbs = Math.round((targetCals - (targetProtein * 4) - (targetFat * 9)) / 4);
-
-        setGoals({
-          calories: targetCals,
-          protein: targetProtein,
-          carbs: targetCarbs,
-          fat: targetFat
+      // Filtrado para el buscador de alimentos
+      const filteredFoods = useMemo(() => {
+        return FOOD_DATABASE.filter(f => {
+          const matchesQuery = searchQuery === "" || f.name.toLowerCase().includes(searchQuery.toLowerCase());
+          const matchesGroup = selectedFoodGroup === "Todos" || f.group === selectedFoodGroup;
+          return matchesQuery && matchesGroup;
         });
-      };
+      }, [searchQuery, selectedFoodGroup]);
 
       const radius = 64;
       const circumference = 2 * Math.PI * radius;
@@ -363,8 +714,8 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
           {/* ENCABEZADO */}
           <header className="p-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/90 sticky top-0 z-20 backdrop-blur">
             <div className="flex items-center gap-2">
-              <i className="fa-solid fa-bars text-slate-400 text-lg"></i>
-              <h1 className="font-bold tracking-wider text-sm uppercase text-slate-100">Diario de Comidas</h1>
+              <i className="fa-solid fa-leaf text-teal-400 text-lg"></i>
+              <h1 className="font-bold tracking-wider text-sm uppercase text-slate-100">NutriScan AI</h1>
             </div>
             <button
               onClick={() => setShowKeyModal(true)}
@@ -390,37 +741,80 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
             {/* VISTA 1: DIARIO */}
             {activeTab === "diario" && (
               <>
-                <div className="relative">
-                  <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
-                  <input
-                    type="text"
-                    placeholder="Buscar alimento o platillo..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-slate-800/90 text-sm text-white rounded-2xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-400 border border-slate-700/60"
-                  />
+                {/* BUSCADOR DE ALIMENTOS EXTENDIDO CON FRUTAS, VERDURAS Y UNIDADES */}
+                <div className="space-y-2">
+                  <div className="relative">
+                    <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                    <input
+                      type="text"
+                      placeholder="Buscar manzana, plátano, tomate, huevo..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-slate-800/90 text-sm text-white rounded-2xl pl-10 pr-9 py-3 focus:outline-none focus:ring-2 focus:ring-teal-400 border border-slate-700/60"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-3.5 top-3 text-slate-400 hover:text-white text-sm"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Pills de categorías para explorar frutas, verduras, etc. */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 text-[11px] no-scrollbar">
+                    {["Todos", "Frutas", "Verduras", "Proteínas", "Cereales", "Lácteos"].map((grp) => (
+                      <button
+                        key={grp}
+                        onClick={() => setSelectedFoodGroup(grp)}
+                        className={`px-3 py-1 rounded-full whitespace-nowrap font-medium transition ${
+                          selectedFoodGroup === grp
+                            ? "bg-teal-500 text-slate-950 font-bold shadow-sm"
+                            : "bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700/60"
+                        }`}
+                      >
+                        {grp}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {searchQuery && (
-                  <div className="bg-slate-800 rounded-2xl p-3 border border-slate-700 space-y-2">
-                    <p className="text-xs text-slate-400 font-medium">Resultados rápidos:</p>
-                    {QUICK_FOODS.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase())).map((food, idx) => (
-                      <div key={idx} className="flex justify-between items-center bg-slate-900/70 p-2.5 rounded-xl">
-                        <div>
-                          <p className="text-sm font-medium">{food.name}</p>
-                          <p className="text-xs text-slate-400">{food.calories} kcal • P:{food.protein}g C:{food.carbs}g G:{food.fat}g</p>
+                {/* RESULTADOS DEL BUSCADOR O CATÁLOGO */}
+                {(searchQuery || selectedFoodGroup !== "Todos") && (
+                  <div className="bg-slate-800 rounded-2xl p-3 border border-slate-700 space-y-2 max-h-64 overflow-y-auto">
+                    <div className="flex justify-between items-center text-xs text-slate-400 font-medium px-1">
+                      <span>Valores por 1 unidad / porción:</span>
+                      <span className="text-teal-400 font-bold">{filteredFoods.length} encontrados</span>
+                    </div>
+
+                    {filteredFoods.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-4">No se encontró ningún alimento con ese nombre.</p>
+                    ) : (
+                      filteredFoods.map((food, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                          <div className="flex-1 pr-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-teal-300 font-semibold">{food.group}</span>
+                              <p className="text-sm font-semibold text-white leading-tight">{food.name}</p>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">
+                              <strong className="text-white font-bold">{food.calories} kcal</strong> • P:{food.protein}g C:{food.carbs}g G:{food.fat}g
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => { addMeal(food); setSearchQuery(""); }}
+                            className="bg-teal-500 hover:bg-teal-400 active:scale-95 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition"
+                          >
+                            + Agregar
+                          </button>
                         </div>
-                        <button
-                          onClick={() => { addMeal(food); setSearchQuery(""); }}
-                          className="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs"
-                        >
-                          + Agregar
-                        </button>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 )}
 
+                {/* RESUMEN DEL DÍA / ANILLO DE CALORÍAS */}
                 <div className="bg-slate-800/60 border border-slate-800 rounded-3xl p-4 flex items-center justify-between gap-4 shadow-lg">
                   <div className="relative flex items-center justify-center">
                     <svg className="w-36 h-36 -rotate-90 transform">
@@ -460,7 +854,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                         <span className="font-bold">{totals.protein}g <span className="text-slate-400 font-normal">/ {goals.protein}g</span></span>
                       </div>
                       <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden">
-                        <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${Math.min((totals.protein / goals.protein) * 100, 100)}%` }}></div>
+                        <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${Math.min((totals.protein / (goals.protein || 1)) * 100, 100)}%` }}></div>
                       </div>
                     </div>
 
@@ -472,7 +866,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                         <span className="font-bold">{totals.carbs}g <span className="text-slate-400 font-normal">/ {goals.carbs}g</span></span>
                       </div>
                       <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden">
-                        <div className="bg-orange-500 h-full rounded-full transition-all" style={{ width: `${Math.min((totals.carbs / goals.carbs) * 100, 100)}%` }}></div>
+                        <div className="bg-orange-500 h-full rounded-full transition-all" style={{ width: `${Math.min((totals.carbs / (goals.carbs || 1)) * 100, 100)}%` }}></div>
                       </div>
                     </div>
 
@@ -484,7 +878,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                         <span className="font-bold">{totals.fat}g <span className="text-slate-400 font-normal">/ {goals.fat}g</span></span>
                       </div>
                       <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden">
-                        <div className="bg-amber-400 h-full rounded-full transition-all" style={{ width: `${Math.min((totals.fat / goals.fat) * 100, 100)}%` }}></div>
+                        <div className="bg-amber-400 h-full rounded-full transition-all" style={{ width: `${Math.min((totals.fat / (goals.fat || 1)) * 100, 100)}%` }}></div>
                       </div>
                     </div>
                   </div>
@@ -503,7 +897,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
 
                   {meals.length === 0 ? (
                     <div className="bg-slate-800/40 border border-slate-800 rounded-2xl p-6 text-center text-slate-400 text-sm">
-                      Aún no has registrado comidas hoy. Usa el botón de abajo para escanear tu plato.
+                      Aún no has registrado comidas hoy. Usa el buscador arriba o escanea tu plato con la cámara.
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
@@ -600,7 +994,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
 
                       <label className="bg-slate-900 hover:bg-slate-800 border border-slate-700 p-5 rounded-2xl flex flex-col items-center gap-2 cursor-pointer transition">
                         <i className="fa-solid fa-image text-3xl text-cyan-400"></i>
-                        <span className="text-xs font-bold">Subir Foto / Cámara Celular</span>
+                        <span className="text-xs font-bold">Subir Foto / Galería</span>
                         <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} className="hidden" />
                       </label>
                     </div>
@@ -615,7 +1009,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="Ej: 1 plato de lomo saltado o 1 plátano"
+                      placeholder="Ej: 1 manzana y 2 huevos cocidos"
                       value={textPrompt}
                       onChange={(e) => setTextPrompt(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && analyzeTextWithGemini()}
@@ -669,8 +1063,9 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                         <span className="text-[10px] text-slate-400 block">Kcal</span>
                         <input
                           type="number"
-                          value={scanResult.calories}
-                          onChange={(e) => setScanResult({ ...scanResult, calories: e.target.value })}
+                          value={scanResult.calories === "" ? "" : scanResult.calories}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => setScanResult({ ...scanResult, calories: e.target.value === "" ? "" : Number(e.target.value) })}
                           className="w-full bg-transparent text-center font-bold text-sm focus:outline-none"
                         />
                       </div>
@@ -678,8 +1073,9 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                         <span className="text-[10px] text-blue-400 block">Prot (g)</span>
                         <input
                           type="number"
-                          value={scanResult.protein}
-                          onChange={(e) => setScanResult({ ...scanResult, protein: e.target.value })}
+                          value={scanResult.protein === "" ? "" : scanResult.protein}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => setScanResult({ ...scanResult, protein: e.target.value === "" ? "" : Number(e.target.value) })}
                           className="w-full bg-transparent text-center font-bold text-sm focus:outline-none"
                         />
                       </div>
@@ -687,8 +1083,9 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                         <span className="text-[10px] text-orange-400 block">Carbs (g)</span>
                         <input
                           type="number"
-                          value={scanResult.carbs}
-                          onChange={(e) => setScanResult({ ...scanResult, carbs: e.target.value })}
+                          value={scanResult.carbs === "" ? "" : scanResult.carbs}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => setScanResult({ ...scanResult, carbs: e.target.value === "" ? "" : Number(e.target.value) })}
                           className="w-full bg-transparent text-center font-bold text-sm focus:outline-none"
                         />
                       </div>
@@ -696,8 +1093,9 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                         <span className="text-[10px] text-amber-400 block">Grasas (g)</span>
                         <input
                           type="number"
-                          value={scanResult.fat}
-                          onChange={(e) => setScanResult({ ...scanResult, fat: e.target.value })}
+                          value={scanResult.fat === "" ? "" : scanResult.fat}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => setScanResult({ ...scanResult, fat: e.target.value === "" ? "" : Number(e.target.value) })}
                           className="w-full bg-transparent text-center font-bold text-sm focus:outline-none"
                         />
                       </div>
@@ -739,79 +1137,423 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                     <span className="text-teal-400">{Math.max(goals.calories - totals.calories, 0)} kcal</span>
                   </div>
                 </div>
+
+                {/* Resumen de TMB y TDEE en estadísticas */}
+                <div className="bg-slate-800/40 border border-slate-800 rounded-2xl p-4 text-xs space-y-2">
+                  <p className="text-slate-300 font-semibold"><i className="fa-solid fa-chart-pie mr-1.5 text-teal-400"></i>Balance Energético:</p>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Tu Tasa Basal (TMB):</span>
+                    <span className="text-white font-bold">{metabolicData.bmr} kcal</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Tu Gasto Diario Total (TDEE):</span>
+                    <span className="text-white font-bold">{metabolicData.tdee} kcal</span>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* VISTA 4: PERFIL Y METAS */}
+            {/* VISTA 4: PERFIL Y METAS (TMB Y TDEE EXACTOS) */}
             {activeTab === "perfil" && (
-              <div className="space-y-4">
-                <h2 className="font-bold text-lg">Configurar Metas Diarias</h2>
-                <div className="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="space-y-5">
+                <div>
+                  <h2 className="font-bold text-lg">Perfil y Metas Nutricionales</h2>
+                  <p className="text-xs text-slate-400">Calcula tus calorías con exactitud según tu cuerpo y nivel real de ejercicio.</p>
+                </div>
+
+                {/* CALCULADORA CIENTÍFICA TMB + TDEE */}
+                <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-4 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-700/60 pb-2">
+                    <h3 className="font-bold text-sm text-teal-400 flex items-center gap-1.5">
+                      <i className="fa-solid fa-calculator"></i>
+                      Calculadora de Metabolismo (Mifflin-St Jeor)
+                    </h3>
+                  </div>
+
+                  {/* SELECTOR DE GÉNERO */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1.5 font-medium">Género </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setProfile({ ...profile, gender: "male" })}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition ${
+                          profile.gender === "male"
+                            ? "bg-teal-500 text-slate-950 border-teal-400"
+                            : "bg-slate-900 text-slate-300 border-slate-700"
+                        }`}
+                      >
+                        <i className="fa-solid fa-mars"></i>Hombre 
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProfile({ ...profile, gender: "female" })}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition ${
+                          profile.gender === "female"
+                            ? "bg-pink-500 text-white border-pink-400"
+                            : "bg-slate-900 text-slate-300 border-slate-700"
+                        }`}
+                      >
+                        <i className="fa-solid fa-venus"></i>Mujer 
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* EDAD, PESO, ALTURA (CON AUTO-SELECCIÓN PARA QUE NO SE PEGUE EL CERO) */}
+                  <div className="grid grid-cols-3 gap-2.5 text-xs">
                     <div>
-                      <label className="text-slate-400">Meta Calorías (kcal)</label>
+                      <label className="text-slate-400 font-medium block">Edad (años)</label>
                       <input
                         type="number"
-                        value={goals.calories}
-                        onChange={(e) => setGoals({ ...goals, calories: Number(e.target.value) })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 font-bold"
+                        value={profile.age === "" ? "" : profile.age}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setProfile({ ...profile, age: e.target.value === "" ? "" : Number(e.target.value) })}
+                        placeholder="22"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 font-bold text-center text-white focus:outline-none focus:border-teal-400"
                       />
                     </div>
                     <div>
-                      <label className="text-blue-400">Proteínas (g)</label>
+                      <label className="text-slate-400 font-medium block">Peso (kg)</label>
                       <input
                         type="number"
-                        value={goals.protein}
-                        onChange={(e) => setGoals({ ...goals, protein: Number(e.target.value) })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 font-bold"
+                        value={profile.weight === "" ? "" : profile.weight}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setProfile({ ...profile, weight: e.target.value === "" ? "" : Number(e.target.value) })}
+                        placeholder="70"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 font-bold text-center text-white focus:outline-none focus:border-teal-400"
                       />
                     </div>
                     <div>
-                      <label className="text-orange-400">Carbohidratos (g)</label>
+                      <label className="text-slate-400 font-medium block">Altura (cm)</label>
                       <input
                         type="number"
-                        value={goals.carbs}
-                        onChange={(e) => setGoals({ ...goals, carbs: Number(e.target.value) })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 font-bold"
+                        value={profile.height === "" ? "" : profile.height}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setProfile({ ...profile, height: e.target.value === "" ? "" : Number(e.target.value) })}
+                        placeholder="170"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 font-bold text-center text-white focus:outline-none focus:border-teal-400"
                       />
                     </div>
+                  </div>
+
+                  {/* SELECTORES INDEPENDIENTES: 1. EJERCICIO O DEPORTE | 2. NIVEL DE ACTIVIDAD FÍSICA */}
+                  <div className="space-y-3.5">
+                    {/* 1. PRIMER BOTÓN DESPLEGABLE: EJERCICIO O DEPORTE */}
                     <div>
-                      <label className="text-amber-400">Grasas (g)</label>
-                      <input
-                        type="number"
-                        value={goals.fat}
-                        onChange={(e) => setGoals({ ...goals, fat: Number(e.target.value) })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 font-bold"
-                      />
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                          <i className="fa-solid fa-dumbbell text-teal-400"></i>
+                          <span>Ejercicio o Deporte:</span>
+                        </label>
+                        <span className="text-[10px] bg-teal-500/10 text-teal-300 border border-teal-500/20 px-2 py-0.5 rounded-full font-medium">
+                          {selectedExercise.short}
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <select
+                          value={profile.exercise || "gym"}
+                          onChange={(e) => handleExerciseChange(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl py-2.5 px-3 pr-8 text-xs text-white font-medium focus:outline-none focus:border-teal-400 cursor-pointer appearance-none transition"
+                        >
+                          {EXERCISE_LEVELS.map((ex) => (
+                            <option key={ex.id} value={ex.id} className="bg-slate-900 text-white">
+                              {ex.label}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                          <i className="fa-solid fa-chevron-down text-[10px]"></i>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 pl-1 leading-snug">
+                        {selectedExercise.desc}
+                      </p>
+
+                      {/* SELECTOR DE FRECUENCIA SEMANAL DEL DEPORTE */}
+                      {profile.exercise !== "none" && (
+                        <div className="mt-2.5 pt-2.5 border-t border-slate-800/80">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                              <i className="fa-regular fa-calendar-check text-teal-400 text-xs"></i>
+                              Frecuencia:
+                            </span>
+                            <span className="text-[10px] text-teal-300 font-bold bg-teal-950/60 px-2 py-0.5 rounded border border-teal-500/20">
+                              {currentFrequency.text}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {FREQUENCIES.map((f) => (
+                              <button
+                                key={f.days}
+                                type="button"
+                                onClick={() => handleFrequencyChange(f.days)}
+                                className={`py-1.5 px-1 rounded-xl text-[10px] font-bold border transition text-center ${
+                                  (profile.exerciseDays || 3) === f.days
+                                    ? "bg-teal-500 text-slate-950 border-teal-400 shadow-sm shadow-teal-500/20"
+                                    : "bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200"
+                                }`}
+                              >
+                                {f.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
+
+                    {/* 2. SEGUNDO BOTÓN DESPLEGABLE: NIVEL DE ACTIVIDAD FÍSICA */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                          <i className="fa-solid fa-person-walking text-teal-400"></i>
+                          <span>Nivel de Actividad Física</span>
+                        </label>
+                        <span className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
+                          {selectedDailyActivity.short}
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <select
+                          value={profile.dailyActivity || "light"}
+                          onChange={(e) => handleDailyActivityChange(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl py-2.5 px-3 pr-8 text-xs text-white font-medium focus:outline-none focus:border-teal-400 cursor-pointer appearance-none transition"
+                        >
+                          {DAILY_ACTIVITY_LEVELS.map((act) => (
+                            <option key={act.id} value={act.id} className="bg-slate-900 text-white">
+                              {act.label}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                          <i className="fa-solid fa-chevron-down text-[10px]"></i>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 pl-1 leading-snug">
+                        {selectedDailyActivity.desc}
+                      </p>
+                    </div>
+
+                    {/* FACTOR COMBINADO DE ACTIVIDAD */}
+                    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-slate-300 flex items-center gap-1.5 font-bold">
+                          <i className="fa-solid fa-fire text-teal-400 text-xs"></i>
+                          Gasto de Actividad Total:
+                        </span>
+                        <div className="text-[10px] text-slate-400 mt-0.5 space-x-1">
+                          <span>Base: <b className="text-slate-300 font-mono">×{selectedDailyActivity.baseFactor}</b></span>
+                          <span>•</span>
+                          <span>Deporte: <b className="text-teal-300 font-mono">{selectedExercise.id !== "none" ? `+${metabolicData.sportFactor || 0}` : "+0"}</b></span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">Multiplicador</span>
+                        <span className="font-extrabold text-teal-300 font-mono text-base">
+                          ×{metabolicData.actMultiplier || profile.activity}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* OBJETIVO NUTRICIONAL */}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-slate-400 font-medium block mb-1">Objetivo Físico:</label>
+                      <select
+                        value={profile.objective}
+                        onChange={(e) => setProfile({ ...profile, objective: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none focus:border-teal-400"
+                      >
+                        <option value="deficit">Perder Grasa (Definición / Déficit calórico)</option>
+                        <option value="maintain">Mantener Peso (Mantenimiento)</option>
+                        <option value="bulk">Ganar Masa Muscular (+350 kcal de superávit)</option>
+                      </select>
+                    </div>
+
+                    {/* SELECTOR Y CALCULADORA DE PÉRDIDA DE GRASA POR SEMANA */}
+                    {profile.objective === "deficit" && (
+                      <div className="bg-slate-900/90 border border-teal-500/30 rounded-2xl p-3.5 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                              <span>🔥</span> Ritmo de Pérdida de Grasa
+                            </span>
+                            <span className="text-[10px] text-slate-400 block mt-0.5">
+                              Ingresa cuánto peso/grasa deseas perder por semana
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-teal-500/40 shrink-0">
+                            <input
+                              type="number"
+                              step="0.05"
+                              min="0.1"
+                              max="1.5"
+                              value={profile.weeklyLossKg === "" ? "" : profile.weeklyLossKg}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) =>
+                                setProfile({
+                                  ...profile,
+                                  weeklyLossKg: e.target.value === "" ? "" : Number(e.target.value)
+                                })
+                              }
+                              className="w-14 bg-transparent text-right font-black text-teal-300 text-sm focus:outline-none"
+                            />
+                            <span className="text-[11px] font-bold text-slate-400">kg/sem</span>
+                          </div>
+                        </div>
+
+                        {/* BOTONES PREESTABLECIDOS RÁPIDOS */}
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-semibold block mb-1.5">Ajuste rápido sugerido:</span>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {[
+                              { kg: 0.25, label: "0.25 kg", desc: "Suave", sub: "-275 kcal" },
+                              { kg: 0.5, label: "0.50 kg", desc: "Recomendado", sub: "-550 kcal" },
+                              { kg: 0.75, label: "0.75 kg", desc: "Intenso", sub: "-825 kcal" },
+                              { kg: 1.0, label: "1.00 kg", desc: "Rápido", sub: "-1100 kcal" }
+                            ].map((opt) => {
+                              const isSelected = Number(profile.weeklyLossKg) === opt.kg;
+                              return (
+                                <button
+                                  key={opt.kg}
+                                  type="button"
+                                  onClick={() => setProfile({ ...profile, weeklyLossKg: opt.kg })}
+                                  className={`py-2 px-1 rounded-xl text-center border transition flex flex-col items-center justify-center ${
+                                    isSelected
+                                      ? "bg-teal-500/20 border-teal-400 text-teal-300 font-bold shadow-sm"
+                                      : "bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white"
+                                  }`}
+                                >
+                                  <span className="text-xs font-bold leading-tight">{opt.label}</span>
+                                  <span className={`text-[9px] mt-0.5 ${isSelected ? "text-teal-200" : "text-slate-500"}`}>
+                                    {opt.desc}
+                                  </span>
+                                  <span className="text-[8px] text-rose-400 font-mono mt-0.5">
+                                    {opt.sub}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* RESUMEN EXPLICATIVO DEL DÉFICIT */}
+                        <div className="bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 text-xs space-y-1.5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 text-[11px]">Déficit Calórico Diario:</span>
+                            <span className="font-extrabold text-rose-400 text-xs font-mono">
+                              -{metabolicData.deficitDaily} kcal/día
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 text-[11px]">Déficit Semanal Total:</span>
+                            <span className="font-semibold text-slate-300 text-[11px] font-mono">
+                              -{Math.round(metabolicData.deficitDaily * 7)} kcal/sem
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 pt-0.5 leading-tight">
+                            *Cálculo metabólico: 1 kg de grasa corporal almacenada equivale a aprox. 7,700 kcal.
+                          </p>
+
+                          {/* ALERTA DE SEGURIDAD */}
+                          {(Number(profile.weeklyLossKg) > 1.0 || (metabolicData.targetCals < 1200 && metabolicData.targetCals > 0)) && (
+                            <div className="mt-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-300 flex items-start gap-1.5 leading-tight">
+                              <span>⚠️</span>
+                              <span>
+                                {Number(profile.weeklyLossKg) > 1.0
+                                  ? "Perder más de 1 kg/semana es un déficit muy agresivo y aumenta el riesgo de perder masa muscular. Se recomienda 0.25 a 0.75 kg/sem."
+                                  : "Tus calorías resultantes están por debajo de 1200 kcal/día. Considera un ritmo de pérdida más gradual para preservar tu salud."}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* EXPLICACIÓN DIDÁCTICA Y RESULTADOS EN VIVO DE TMB Y TDEE */}
+                  <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block font-semibold">TMB (Metabolismo Basal)</span>
+                        <span className="text-lg font-black text-teal-300">{metabolicData.bmr} <span className="text-xs font-normal text-slate-400">kcal</span></span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">Calorías que quemas en reposo absoluto solo por vivir.</span>
+                      </div>
+                      <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block font-semibold">TDEE (Gasto Diario Total)</span>
+                        <span className="text-lg font-black text-emerald-300">{metabolicData.tdee} <span className="text-xs font-normal text-slate-400">kcal</span></span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">TMB multiplicada por tu actividad y ejercicio.</span>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-teal-300 font-bold block">Calorías Recomendadas:</span>
+                        <span className="text-[11px] text-slate-400">
+                          {profile.objective === "deficit"
+                            ? `Déficit de -${metabolicData.deficitDaily} kcal (${metabolicData.weeklyLossKg || 0.5} kg/sem)`
+                            : profile.objective === "bulk"
+                            ? "Superávit de +350 kcal/día"
+                            : "Mantenimiento exacto (TDEE)"}
+                        </span>
+                      </div>
+                      <span className="text-xl font-extrabold text-teal-400">{metabolicData.targetCals} kcal</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={calculateAutoGoals}
+                      className="w-full bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 font-extrabold py-3 rounded-xl text-xs shadow-lg shadow-teal-500/20 active:scale-98 transition"
+                    >
+                      Aplicar a Mis Metas Diarias
+                    </button>
                   </div>
                 </div>
 
-                <div className="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 space-y-3">
-                  <h3 className="font-bold text-sm text-teal-400">Calculadora Automática (TDEE)</h3>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                {/* METAS DIARIAS ACTIVAS (EDITABLES SIN PROBLEMA DEL CERO) */}
+                <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-4 space-y-3">
+                  <h3 className="font-bold text-sm text-white">Metas Diarias Actuales</h3>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <label className="text-slate-400">Peso (kg)</label>
-                      <input type="number" value={profile.weight} onChange={e => setProfile({...profile, weight: Number(e.target.value)})} className="w-full bg-slate-900 rounded-lg p-2 mt-1" />
+                      <label className="text-slate-400 font-medium">Meta Calorías (kcal)</label>
+                      <input
+                        type="number"
+                        value={goals.calories === "" ? "" : goals.calories}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setGoals({ ...goals, calories: e.target.value === "" ? "" : Number(e.target.value) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 font-bold text-white focus:outline-none focus:border-teal-400"
+                      />
                     </div>
                     <div>
-                      <label className="text-slate-400">Altura (cm)</label>
-                      <input type="number" value={profile.height} onChange={e => setProfile({...profile, height: Number(e.target.value)})} className="w-full bg-slate-900 rounded-lg p-2 mt-1" />
+                      <label className="text-blue-400 font-medium">Proteínas (g)</label>
+                      <input
+                        type="number"
+                        value={goals.protein === "" ? "" : goals.protein}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setGoals({ ...goals, protein: e.target.value === "" ? "" : Number(e.target.value) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 font-bold text-white focus:outline-none focus:border-teal-400"
+                      />
                     </div>
                     <div>
-                      <label className="text-slate-400">Edad</label>
-                      <input type="number" value={profile.age} onChange={e => setProfile({...profile, age: Number(e.target.value)})} className="w-full bg-slate-900 rounded-lg p-2 mt-1" />
+                      <label className="text-orange-400 font-medium">Carbohidratos (g)</label>
+                      <input
+                        type="number"
+                        value={goals.carbs === "" ? "" : goals.carbs}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setGoals({ ...goals, carbs: e.target.value === "" ? "" : Number(e.target.value) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 font-bold text-white focus:outline-none focus:border-teal-400"
+                      />
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <select value={profile.objective} onChange={e => setProfile({...profile, objective: e.target.value})} className="bg-slate-900 rounded-lg p-2">
-                      <option value="deficit">Perder Grasa (-400 kcal)</option>
-                      <option value="maintain">Mantener Peso</option>
-                      <option value="bulk">Ganar Masa (+350 kcal)</option>
-                    </select>
-                    <button onClick={calculateAutoGoals} className="bg-teal-500 text-slate-950 font-bold rounded-lg p-2">
-                      Calcular Mis Macros
-                    </button>
+                    <div>
+                      <label className="text-amber-400 font-medium">Grasas (g)</label>
+                      <input
+                        type="number"
+                        value={goals.fat === "" ? "" : goals.fat}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setGoals({ ...goals, fat: e.target.value === "" ? "" : Number(e.target.value) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 mt-1 font-bold text-white focus:outline-none focus:border-teal-400"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
