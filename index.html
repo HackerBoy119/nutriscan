@@ -133,7 +133,6 @@
         return CLAVE_FIJA_OPCIONAL || localStorage.getItem("nutriscan_apikey") || "";
       });
 
-      // Si el móvil tenía guardado un modelo viejo como 2.0 o 2.5, lo migra automáticamente a gemini-3.8-flash
       const [modelName, setModelName] = useState(() => {
         const savedModel = localStorage.getItem("nutriscan_model");
         if (!savedModel || savedModel.includes("2.0") || savedModel.includes("2.5") || savedModel.includes("1.5")) {
@@ -206,6 +205,17 @@
       const [textPrompt, setTextPrompt] = useState("");
       const [searchQuery, setSearchQuery] = useState("");
       const [selectedFoodGroup, setSelectedFoodGroup] = useState("Todos");
+
+      // Estado para el formulario de ingreso manual de calorías y alimentos en el Diario
+      const [showManualForm, setShowManualForm] = useState(false);
+      const [manualEntry, setManualEntry] = useState({
+        name: "",
+        category: "Almuerzo",
+        calories: "",
+        protein: "",
+        carbs: "",
+        fat: ""
+      });
 
       const videoRef = useRef(null);
       const canvasRef = useRef(null);
@@ -337,9 +347,7 @@
         });
       };
 
-      // =========================================================================
-      // COMPRESOR AUTOMÁTICO DE FOTOS PARA MÓVIL (Evita fallos por fotos pesadas)
-      // =========================================================================
+      // COMPRESOR AUTOMÁTICO DE FOTOS PARA MÓVIL
       const compressImage = (dataUrl, maxWidth = 800, quality = 0.75) => {
         return new Promise((resolve) => {
           const img = new Image();
@@ -367,9 +375,7 @@
         });
       };
 
-      // =========================================================================
       // CÁMARA CORREGIDA PARA MÓVILES Y PC
-      // =========================================================================
       const startCamera = async () => {
         setErrorMsg("");
         try {
@@ -389,7 +395,6 @@
           streamRef.current = stream;
           setCameraActive(true);
         } catch (err) {
-          // Si el navegador móvil bloquea el visor web, abre la cámara nativa del teléfono automáticamente
           if (nativeCameraInputRef.current) {
             nativeCameraInputRef.current.click();
           } else {
@@ -398,7 +403,6 @@
         }
       };
 
-      // Conecta el stream al elemento <video> una vez que ya existe en pantalla
       useEffect(() => {
         if (cameraActive && videoRef.current && streamRef.current) {
           videoRef.current.srcObject = streamRef.current;
@@ -444,7 +448,7 @@
           analyzeImageWithGemini(compressed);
         };
         reader.readAsDataURL(file);
-        e.target.value = ""; // Permite volver a subir la misma foto si se desea
+        e.target.value = "";
       };
 
       const parseSafeJson = (rawText) => {
@@ -457,9 +461,7 @@
         return JSON.parse(cleaned);
       };
 
-      // =========================================================================
-      // LLAMADA A GEMINI SIN MODELOS OBSOLETOS (Solo serie 3.8 activa)
-      // =========================================================================
+      // LLAMADA A GEMINI
       const callGeminiWithRetry = async (contentsPayload) => {
         const cleanCurrent = (modelName.includes("2.0") || modelName.includes("2.5")) ? MODELO_POR_DEFECTO : modelName;
         const fallbackModels = [
@@ -618,6 +620,37 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
         setActiveTab("diario");
       };
 
+      // Función para guardar calorías o alimentos ingresados manualmente en el Diario
+      const handleAddManualMeal = (e) => {
+        if (e) e.preventDefault();
+        const cals = Number(manualEntry.calories);
+        if (!cals || cals <= 0) {
+          setErrorMsg("Ingresa una cantidad válida de calorías (mayor a 0).");
+          return;
+        }
+        setErrorMsg("");
+        addMeal(
+          {
+            name: manualEntry.name.trim() || `Registro rápido (${cals} kcal)`,
+            calories: cals,
+            protein: Number(manualEntry.protein) || 0,
+            carbs: Number(manualEntry.carbs) || 0,
+            fat: Number(manualEntry.fat) || 0,
+            category: manualEntry.category
+          },
+          manualEntry.category
+        );
+        setManualEntry({
+          name: "",
+          category: manualEntry.category,
+          calories: "",
+          protein: "",
+          carbs: "",
+          fat: ""
+        });
+        setShowManualForm(false);
+      };
+
       const deleteMeal = (id) => {
         setMeals(meals.filter(m => m.id !== id));
       };
@@ -713,7 +746,20 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                     </div>
 
                     {filteredFoods.length === 0 ? (
-                      <p className="text-xs text-slate-400 text-center py-4">No se encontró ningún alimento con ese nombre.</p>
+                      <div className="text-center py-3 space-y-2">
+                        <p className="text-xs text-slate-400">No se encontró "{searchQuery}" en la base de datos.</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualEntry({ ...manualEntry, name: searchQuery });
+                            setShowManualForm(true);
+                            setSearchQuery("");
+                          }}
+                          className="bg-teal-500/20 border border-teal-500/40 text-teal-300 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-teal-500 hover:text-slate-950 transition"
+                        >
+                          + Agregar "{searchQuery}" manualmente con sus calorías
+                        </button>
+                      </div>
                     ) : (
                       filteredFoods.map((food, idx) => (
                         <div key={idx} className="flex justify-between items-center bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
@@ -738,6 +784,142 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                   </div>
                 )}
 
+                {/* BOTÓN Y FORMULARIO PARA AGREGAR CALORÍAS / ALIMENTO MANUALMENTE */}
+                <div>
+                  {!showManualForm ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowManualForm(true)}
+                      className="w-full py-2.5 px-4 rounded-2xl bg-slate-800/80 hover:bg-slate-800 border border-teal-500/30 text-teal-300 text-xs font-bold flex items-center justify-between transition active:scale-98"
+                    >
+                      <span className="flex items-center gap-2">
+                        <i className="fa-solid fa-circle-plus text-teal-400 text-sm"></i>
+                        <span>Agregar Calorías / Alimento Manual</span>
+                      </span>
+                      <span className="text-[10px] bg-teal-500/10 px-2 py-0.5 rounded-full text-teal-400 border border-teal-500/20">
+                        Ingreso libre
+                      </span>
+                    </button>
+                  ) : (
+                    <form
+                      onSubmit={handleAddManualMeal}
+                      className="bg-slate-800/90 border border-teal-500/50 rounded-3xl p-4 space-y-3 shadow-xl"
+                    >
+                      <div className="flex justify-between items-center border-b border-slate-700/70 pb-2">
+                        <h3 className="text-xs font-bold text-teal-400 uppercase flex items-center gap-1.5">
+                          <i className="fa-solid fa-fire-flame-curved"></i>
+                          Agregar Calorías Manualmente
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowManualForm(false)}
+                          className="text-xs text-slate-400 hover:text-white px-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* Categoría de comida */}
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {["Desayuno", "Almuerzo", "Cena", "Snacks"].map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setManualEntry({ ...manualEntry, category: cat })}
+                            className={`py-1.5 rounded-xl text-[11px] font-bold border transition ${
+                              manualEntry.category === cat
+                                ? "bg-teal-500 text-slate-950 border-teal-400"
+                                : "bg-slate-900 text-slate-400 border-slate-700"
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Nombre y Calorías obligatorias */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="col-span-2">
+                          <label className="text-[11px] text-slate-300 font-medium block mb-1">
+                            Nombre del alimento (opcional):
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej: Galletas, Empanada, Jugo..."
+                            value={manualEntry.name}
+                            onChange={(e) => setManualEntry({ ...manualEntry, name: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-teal-300 font-bold block mb-1">
+                            Calorías (kcal)*:
+                          </label>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            placeholder="Ej: 250"
+                            value={manualEntry.calories}
+                            onChange={(e) => setManualEntry({ ...manualEntry, calories: e.target.value })}
+                            className="w-full bg-slate-950 border border-teal-500/60 rounded-xl px-2.5 py-2 text-xs font-extrabold text-center text-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Macros opcionales */}
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-1.5">
+                          Macronutrientes en gramos (Opcional — déjalos vacíos si solo quieres sumar calorías):
+                        </span>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-2 flex items-center justify-between">
+                            <span className="text-[10px] text-blue-400 font-bold">Prot (g):</span>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              value={manualEntry.protein}
+                              onChange={(e) => setManualEntry({ ...manualEntry, protein: e.target.value })}
+                              className="w-12 bg-transparent text-right text-xs font-bold text-white focus:outline-none"
+                            />
+                          </div>
+                          <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-2 flex items-center justify-between">
+                            <span className="text-[10px] text-orange-400 font-bold">Carbs (g):</span>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              value={manualEntry.carbs}
+                              onChange={(e) => setManualEntry({ ...manualEntry, carbs: e.target.value })}
+                              className="w-12 bg-transparent text-right text-xs font-bold text-white focus:outline-none"
+                            />
+                          </div>
+                          <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-2 flex items-center justify-between">
+                            <span className="text-[10px] text-amber-400 font-bold">Grasa (g):</span>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              value={manualEntry.fat}
+                              onChange={(e) => setManualEntry({ ...manualEntry, fat: e.target.value })}
+                              className="w-12 bg-transparent text-right text-xs font-bold text-white focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-teal-500 hover:bg-teal-400 active:scale-98 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs transition shadow-md shadow-teal-500/10"
+                      >
+                        + Sumar a mis calorías del día
+                      </button>
+                    </form>
+                  )}
+                </div>
+
+                {/* TARJETA PRINCIPAL DE PROGRESO DE CALORÍAS Y MACROS */}
                 <div className="bg-slate-800/60 border border-slate-800 rounded-3xl p-4 flex items-center justify-between gap-4 shadow-lg">
                   <div className="relative flex items-center justify-center">
                     <svg className="w-36 h-36 -rotate-90 transform">
@@ -820,7 +1002,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
 
                   {meals.length === 0 ? (
                     <div className="bg-slate-800/40 border border-slate-800 rounded-2xl p-6 text-center text-slate-400 text-sm">
-                      Aún no has registrado comidas hoy. Usa el buscador arriba o escanea tu plato con la cámara.
+                      Aún no has registrado comidas hoy. Usa el buscador arriba, agrega calorías manuales o escanea tu plato.
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
@@ -887,7 +1069,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                 </div>
 
                 <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-4 text-center space-y-3">
-                  {/* El video siempre existe en el DOM para que funcione en móviles sin fallar */}
                   <div className={cameraActive ? "space-y-3 block" : "hidden"}>
                     <video
                       ref={videoRef}
@@ -917,7 +1098,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                   {!cameraActive && (
                     <div className="space-y-2.5">
                       <div className="grid grid-cols-2 gap-3">
-                        {/* BOTÓN 1: USAR CÁMARA */}
                         <button
                           type="button"
                           onClick={startCamera}
@@ -928,7 +1108,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                           <span className="text-[10px] text-slate-400">Tomar foto ahora</span>
                         </button>
 
-                        {/* BOTÓN 2: SUBIR FOTO O CAPTURA DESDE GALERÍA (Sin capture="environment") */}
                         <label className="bg-slate-900 hover:bg-slate-800 active:scale-95 border border-slate-700 p-5 rounded-2xl flex flex-col items-center gap-2 cursor-pointer transition">
                           <i className="fa-solid fa-images text-3xl text-cyan-400"></i>
                           <span className="text-xs font-bold">Subir Foto / Galería</span>
@@ -942,7 +1121,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                         </label>
                       </div>
 
-                      {/* Respaldo de cámara nativa para móviles si el navegador bloquea el visor en vivo */}
                       <input
                         ref={nativeCameraInputRef}
                         type="file"
