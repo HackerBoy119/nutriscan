@@ -22,9 +22,8 @@
     const CLAVE_FIJA_OPCIONAL = ""; 
     const MODELO_POR_DEFECTO = "gemini-3.8-flash";
 
-    // Base de datos extendida con frutas, verduras, proteínas, cereales y platos típicos por unidad/porción
     const FOOD_DATABASE = [
-      // FRUTAS (Valores por 1 unidad estándar o porción común)
+      // FRUTAS
       { name: "Plátano / Banana (1 unidad mediana ~120g)", group: "Frutas", calories: 105, protein: 1.3, carbs: 27, fat: 0.4, category: "Snacks" },
       { name: "Manzana (1 unidad mediana ~180g)", group: "Frutas", calories: 95, protein: 0.5, carbs: 25, fat: 0.3, category: "Snacks" },
       { name: "Naranja (1 unidad mediana ~130g)", group: "Frutas", calories: 62, protein: 1.2, carbs: 15, fat: 0.2, category: "Snacks" },
@@ -43,12 +42,12 @@
       { name: "Papaya picada (1 taza ~150g)", group: "Frutas", calories: 65, protein: 0.9, carbs: 16, fat: 0.4, category: "Desayuno" },
       { name: "Uvas (1 racimo pequeño / 15 uvas)", group: "Frutas", calories: 60, protein: 0.6, carbs: 16, fat: 0.2, category: "Snacks" },
 
-      // VERDURAS Y HORTALIZAS (Valores por 1 unidad o porción de taza)
+      // VERDURAS Y HORTALIZAS
       { name: "Tomate (1 unidad mediana ~120g)", group: "Verduras", calories: 22, protein: 1.1, carbs: 4.8, fat: 0.2, category: "Almuerzo" },
       { name: "Zanahoria (1 unidad mediana ~60g)", group: "Verduras", calories: 25, protein: 0.6, carbs: 6.0, fat: 0.1, category: "Snacks" },
       { name: "Pepino entero (1 unidad mediana ~200g)", group: "Verduras", calories: 30, protein: 1.3, carbs: 7.0, fat: 0.2, category: "Almuerzo" },
       { name: "Cebolla (1 unidad mediana ~110g)", group: "Verduras", calories: 44, protein: 1.2, carbs: 10.0, fat: 0.1, category: "Almuerzo" },
-      { name: "Pimiento / Morro (1 unidad mediana ~120g)", group: "Verduras", calories: 30, protein: 1.2, carbs: 7.0, fat: 0.3, category: "Almuerzo" },
+      { name: "Pimiento / Morrón (1 unidad mediana ~120g)", group: "Verduras", calories: 30, protein: 1.2, carbs: 7.0, fat: 0.3, category: "Almuerzo" },
       { name: "Diente de Ajo (1 unidad)", group: "Verduras", calories: 4, protein: 0.2, carbs: 1.0, fat: 0.0, category: "Almuerzo" },
       { name: "Tallo de Apio (1 tallo entero)", group: "Verduras", calories: 10, protein: 0.5, carbs: 2.0, fat: 0.1, category: "Snacks" },
       { name: "Papa / Patata cocida (1 unidad mediana ~150g)", group: "Verduras", calories: 130, protein: 3.0, carbs: 30.0, fat: 0.2, category: "Almuerzo" },
@@ -60,7 +59,7 @@
       { name: "Zapallo / Calabaza cocida (100g)", group: "Verduras", calories: 26, protein: 1.0, carbs: 6.5, fat: 0.1, category: "Almuerzo" },
       { name: "Espárragos (5 unidades medianas)", group: "Verduras", calories: 20, protein: 2.2, carbs: 3.8, fat: 0.2, category: "Cena" },
 
-      // PROTEÍNAS Y LÁCTEOS (Por unidad / porción)
+      // PROTEÍNAS Y LÁCTEOS
       { name: "Huevo cocido / pasado (1 unidad grande ~50g)", group: "Proteínas", calories: 74, protein: 6.3, carbs: 0.4, fat: 5.0, category: "Desayuno" },
       { name: "Clara de Huevo (1 unidad)", group: "Proteínas", calories: 17, protein: 3.6, carbs: 0.2, fat: 0.1, category: "Desayuno" },
       { name: "2 Huevos Revueltos", group: "Proteínas", calories: 182, protein: 12, carbs: 2, fat: 14, category: "Desayuno" },
@@ -93,130 +92,26 @@
       { name: "Arroz con Pollo (Plato casero)", group: "Platos", calories: 590, protein: 35, carbs: 70, fat: 18, category: "Almuerzo" }
     ];
 
-    // 1. Ejercicios y Deportes Específicos (Con factor metabólico por disciplina)
     const EXERCISE_LEVELS = [
-      {
-        id: "none",
-        label: "Ninguno (Sin deporte ni ejercicio regular)",
-        short: "Sin deporte",
-        factor: 0.0,
-        desc: "Poco o ningún deporte o ejercicio programado en la semana."
-      },
-      {
-        id: "gym",
-        label: "🏋️ Gimnasio / Pesas / Musculación",
-        short: "Gimnasio / Pesas",
-        factor: 0.25,
-        desc: "Entrenamiento de fuerza, hipertrofia o levantamiento de pesas en sala de musculación."
-      },
-      {
-        id: "running",
-        label: "🏃 Running / Trote / Carrera al aire libre",
-        short: "Running / Trote",
-        factor: 0.32,
-        desc: "Carrera continua en asfalto, pista o trotadora, cardio aeróbico y atletismo."
-      },
-      {
-        id: "football",
-        label: "⚽ Fútbol / Futsal / Fútbol 7",
-        short: "Fútbol / Futsal",
-        factor: 0.30,
-        desc: "Partidos y entrenamientos con sprints, cambios de ritmo y esfuerzo aeróbico/anaeróbico."
-      },
-      {
-        id: "crossfit",
-        label: "🔥 CrossFit / HIIT / Entrenamiento Funcional",
-        short: "CrossFit / HIIT",
-        factor: 0.35,
-        desc: "Circuitos de alta intensidad, levantamientos olímpicos, intervalos metabólicos y WODs."
-      },
-      {
-        id: "cycling",
-        label: "🚴 Ciclismo / Bicicleta / Spinning",
-        short: "Ciclismo / Bici",
-        factor: 0.28,
-        desc: "Ruta en bicicleta, spinning estático en gimnasio o ciclismo de montaña (MTB)."
-      },
-      {
-        id: "swimming",
-        label: "🏊 Natación",
-        short: "Natación",
-        factor: 0.28,
-        desc: "Nado continuo en piscina (crol, braza, espalda o mariposa), cardio completo de bajo impacto."
-      },
-      {
-        id: "combat",
-        label: "🥊 Boxeo / Artes Marciales / Muay Thai / MMA",
-        short: "Boxeo / Contacto",
-        factor: 0.35,
-        desc: "Combate, sparring, rounds de saco, jiu-jitsu o artes marciales de alta demanda calórica."
-      },
-      {
-        id: "calisthenics",
-        label: "🤸 Calistenia / Barras / Street Workout",
-        short: "Calistenia",
-        factor: 0.25,
-        desc: "Dominadas, fondos, flexiones y control acrobático con el propio peso corporal."
-      },
-      {
-        id: "racket",
-        label: "🎾 Pádel / Tenis / Frontón",
-        short: "Pádel / Tenis",
-        factor: 0.26,
-        desc: "Deportes de raqueta con desplazamientos rápidos, cambios de dirección y sprints continuos."
-      },
-      {
-        id: "basketball",
-        label: "🏀 Básquetbol / Baloncesto",
-        short: "Básquetbol",
-        factor: 0.28,
-        desc: "Juego continuo con saltos, rebotes y transiciones rápidas de cancha a cancha."
-      },
-      {
-        id: "volleyball",
-        label: "🏐 Vóleibol / Vóley Playa",
-        short: "Vóleibol",
-        factor: 0.22,
-        desc: "Saltos explosivos, remates, bloqueos y desplazamientos dinámicos."
-      },
-      {
-        id: "walking",
-        label: "🥾 Caminata Rápida / Senderismo / Trekking",
-        short: "Caminata / Trekking",
-        factor: 0.18,
-        desc: "Marcha activa a paso constante (>5 km/h) o senderismo con desniveles en montaña."
-      },
-      {
-        id: "dance",
-        label: "💃 Baile / Zumba / Danza Aeróbica",
-        short: "Baile / Zumba",
-        factor: 0.22,
-        desc: "Sesiones de baile, zumba, ritmos latinos o danza coreográfica continua."
-      },
-      {
-        id: "yoga",
-        label: "🧘 Yoga / Pilates / Estiramiento Funcional",
-        short: "Yoga / Pilates",
-        factor: 0.12,
-        desc: "Fuerza isométrica, control postural, flexibilidad y tonificación profunda de bajo impacto."
-      },
-      {
-        id: "multisport",
-        label: "🎽 Deportes Mixtos / Multideporte Variado",
-        short: "Deportes Mixtos",
-        factor: 0.28,
-        desc: "Combinación de varios deportes en la semana (ej. pesas + fútbol o running)."
-      },
-      {
-        id: "athlete",
-        label: "🥇 Atleta Profesional / Alto Rendimiento (Doble turno)",
-        short: "Atleta Élite",
-        factor: 0.48,
-        desc: "Deportista de competición federado, entrenamientos diarios intensos o doble turno."
-      }
+      { id: "none", label: "Ninguno (Sin deporte ni ejercicio regular)", short: "Sin deporte", factor: 0.0, desc: "Poco o ningún deporte o ejercicio programado en la semana." },
+      { id: "gym", label: "🏋️ Gimnasio / Pesas / Musculación", short: "Gimnasio / Pesas", factor: 0.25, desc: "Entrenamiento de fuerza, hipertrofia o levantamiento de pesas en sala de musculación." },
+      { id: "running", label: "🏃 Running / Trote / Carrera al aire libre", short: "Running / Trote", factor: 0.32, desc: "Carrera continua en asfalto, pista o trotadora, cardio aeróbico y atletismo." },
+      { id: "football", label: "⚽ Fútbol / Futsal / Fútbol 7", short: "Fútbol / Futsal", factor: 0.30, desc: "Partidos y entrenamientos con sprints, cambios de ritmo y esfuerzo aeróbico/anaeróbico." },
+      { id: "crossfit", label: "🔥 CrossFit / HIIT / Entrenamiento Funcional", short: "CrossFit / HIIT", factor: 0.35, desc: "Circuitos de alta intensidad, levantamientos olímpicos, intervalos metabólicos y WODs." },
+      { id: "cycling", label: "🚴 Ciclismo / Bicicleta / Spinning", short: "Ciclismo / Bici", factor: 0.28, desc: "Ruta en bicicleta, spinning estático en gimnasio o ciclismo de montaña (MTB)." },
+      { id: "swimming", label: "🏊 Natación", short: "Natación", factor: 0.28, desc: "Nado continuo en piscina (crol, braza, espalda o mariposa), cardio completo de bajo impacto." },
+      { id: "combat", label: "🥊 Boxeo / Artes Marciales / Muay Thai / MMA", short: "Boxeo / Contacto", factor: 0.35, desc: "Combate, sparring, rounds de saco, jiu-jitsu o artes marciales de alta demanda calórica." },
+      { id: "calisthenics", label: "🤸 Calistenia / Barras / Street Workout", short: "Calistenia", factor: 0.25, desc: "Dominadas, fondos, flexiones y control acrobático con el propio peso corporal." },
+      { id: "racket", label: "🎾 Pádel / Tenis / Frontón", short: "Pádel / Tenis", factor: 0.26, desc: "Deportes de raqueta con desplazamientos rápidos, cambios de dirección y sprints continuos." },
+      { id: "basketball", label: "🏀 Básquetbol / Baloncesto", short: "Básquetbol", factor: 0.28, desc: "Juego continuo con saltos, rebotes y transiciones rápidas de cancha a cancha." },
+      { id: "volleyball", label: "🏐 Vóleibol / Vóley Playa", short: "Vóleibol", factor: 0.22, desc: "Saltos explosivos, remates, bloqueos y desplazamientos dinámicos." },
+      { id: "walking", label: "🥾 Caminata Rápida / Senderismo / Trekking", short: "Caminata / Trekking", factor: 0.18, desc: "Marcha activa a paso constante (>5 km/h) o senderismo con desniveles en montaña." },
+      { id: "dance", label: "💃 Baile / Zumba / Danza Aeróbica", short: "Baile / Zumba", factor: 0.22, desc: "Sesiones de baile, zumba, ritmos latinos o danza coreográfica continua." },
+      { id: "yoga", label: "🧘 Yoga / Pilates / Estiramiento Funcional", short: "Yoga / Pilates", factor: 0.12, desc: "Fuerza isométrica, control postural, flexibilidad y tonificación profunda de bajo impacto." },
+      { id: "multisport", label: "🎽 Deportes Mixtos / Multideporte Variado", short: "Deportes Mixtos", factor: 0.28, desc: "Combinación de varios deportes en la semana (ej. pesas + fútbol o running)." },
+      { id: "athlete", label: "🥇 Atleta Profesional / Alto Rendimiento (Doble turno)", short: "Atleta Élite", factor: 0.48, desc: "Deportista de competición federado, entrenamientos diarios intensos o doble turno." }
     ];
 
-    // Frecuencias semanales de entrenamiento
     const FREQUENCIES = [
       { days: 1, label: "1 a 2 días", mult: 0.6, text: "1 a 2 días/semana" },
       { days: 3, label: "3 a 4 días", mult: 1.0, text: "3 a 4 días/semana" },
@@ -224,36 +119,11 @@
       { days: 7, label: "Diario (7d)", mult: 1.5, text: "Todos los días (7d)" }
     ];
 
-    // 2. Nivel de Actividad Física (Cotidiana / Ocupacional / Pasos diarios)
     const DAILY_ACTIVITY_LEVELS = [
-      {
-        id: "sedentary",
-        label: "Sedentario (Oficina / Mayormente sentado)",
-        short: "<4,000 pasos / Sentado",
-        baseFactor: 1.2,
-        desc: "Trabajo de escritorio, estudio o computador la mayor parte del día, menos de 4,000 pasos diarios."
-      },
-      {
-        id: "light",
-        label: "Ligeramente Activo (De pie a ratos / Paseos regulares)",
-        short: "4,000 a 7,000 pasos",
-        baseFactor: 1.3,
-        desc: "Pasa tiempo de pie o caminando a ratos en casa/oficina, quehaceres cotidianos y desplazamientos."
-      },
-      {
-        id: "moderate",
-        label: "Moderadamente Activo (De pie o caminando continuo)",
-        short: "7,000 a 11,000 pasos",
-        baseFactor: 1.4,
-        desc: "Trabajo activo donde se camina o está de pie constantemente (mesero, ventas, docencia, enfermería)."
-      },
-      {
-        id: "heavy",
-        label: "Muy Activo (Trabajo físico pesado o continuo)",
-        short: ">12,000 pasos / Físico pesado",
-        baseFactor: 1.5,
-        desc: "Trabajo manual pesado y exigente (construcción, almacén y carga, agricultura, reparto en bici)."
-      }
+      { id: "sedentary", label: "Sedentario (Oficina / Mayormente sentado)", short: "<4,000 pasos / Sentado", baseFactor: 1.2, desc: "Trabajo de escritorio, estudio o computador la mayor parte del día, menos de 4,000 pasos diarios." },
+      { id: "light", label: "Ligeramente Activo (De pie a ratos / Paseos regulares)", short: "4,000 a 7,000 pasos", baseFactor: 1.3, desc: "Pasa tiempo de pie o caminando a ratos en casa/oficina, quehaceres cotidianos y desplazamientos." },
+      { id: "moderate", label: "Moderadamente Activo (De pie o caminando continuo)", short: "7,000 a 11,000 pasos", baseFactor: 1.4, desc: "Trabajo activo donde se camina o está de pie constantemente (mesero, ventas, docencia, enfermería)." },
+      { id: "heavy", label: "Muy Activo (Trabajo físico pesado o continuo)", short: ">12,000 pasos / Físico pesado", baseFactor: 1.5, desc: "Trabajo manual pesado y exigente (construcción, almacén y carga, agricultura, reparto en bici)." }
     ];
 
     function App() {
@@ -262,8 +132,15 @@
       const [apiKey, setApiKey] = useState(() => {
         return CLAVE_FIJA_OPCIONAL || localStorage.getItem("nutriscan_apikey") || "";
       });
+
+      // Si el móvil tenía guardado un modelo viejo como 2.0 o 2.5, lo migra automáticamente a gemini-3.8-flash
       const [modelName, setModelName] = useState(() => {
-        return localStorage.getItem("nutriscan_model") || MODELO_POR_DEFECTO;
+        const savedModel = localStorage.getItem("nutriscan_model");
+        if (!savedModel || savedModel.includes("2.0") || savedModel.includes("2.5") || savedModel.includes("1.5")) {
+          localStorage.setItem("nutriscan_model", MODELO_POR_DEFECTO);
+          return MODELO_POR_DEFECTO;
+        }
+        return savedModel;
       });
       const [showKeyModal, setShowKeyModal] = useState(false);
 
@@ -280,7 +157,6 @@
         return saved ? JSON.parse(saved) : { calories: 2000, protein: 120, carbs: 220, fat: 65 };
       });
 
-      // Perfil con género, deporte/ejercicio y actividad física seleccionables por separado
       const [profile, setProfile] = useState(() => {
         const defaultProfile = {
           gender: "male",
@@ -333,6 +209,8 @@
 
       const videoRef = useRef(null);
       const canvasRef = useRef(null);
+      const streamRef = useRef(null);
+      const nativeCameraInputRef = useRef(null);
       const [cameraActive, setCameraActive] = useState(false);
 
       useEffect(() => {
@@ -349,7 +227,10 @@
 
       const saveConfig = (newKey, newModel) => {
         const trimmedKey = newKey.trim();
-        const trimmedModel = (newModel || MODELO_POR_DEFECTO).trim().replace(/^models\//, "");
+        let trimmedModel = (newModel || MODELO_POR_DEFECTO).trim().replace(/^models\//, "");
+        if (trimmedModel.includes("2.0") || trimmedModel.includes("2.5")) {
+          trimmedModel = MODELO_POR_DEFECTO;
+        }
         setApiKey(trimmedKey);
         setModelName(trimmedModel);
         localStorage.setItem("nutriscan_apikey", trimmedKey);
@@ -388,14 +269,11 @@
           return { bmr: 0, tdee: 0, targetCals: 0, actMultiplier: act, sportFactor, deficitDaily: 0, weeklyLossKg: lossTarget };
         }
 
-        // Fórmula Mifflin-St Jeor
         let bmr = (10 * w) + (6.25 * h) - (5 * a) + (profile.gender === "male" ? 5 : -161);
         let tdee = bmr * act;
 
         let targetCals = tdee;
         if (profile.objective === "deficit") {
-          // 1 kg de grasa equivale aprox a 7,700 kcal.
-          // Déficit diario = (pérdida_semanal_kg * 7700) / 7 = pérdida_semanal_kg * 1100 kcal/día
           deficitDaily = Math.round(lossTarget * 1100);
           targetCals -= deficitDaily;
         } else if (profile.objective === "bulk") {
@@ -419,11 +297,7 @@
         const freqObj = FREQUENCIES.find((f) => f.days === (profile.exerciseDays || 3)) || FREQUENCIES[1];
         const sportFactor = ex.id === "none" ? 0.0 : Number((ex.factor * freqObj.mult).toFixed(3));
         const combined = Number((daily.baseFactor + sportFactor).toFixed(3));
-        setProfile((prev) => ({
-          ...prev,
-          exercise: newExercise,
-          activity: combined
-        }));
+        setProfile((prev) => ({ ...prev, exercise: newExercise, activity: combined }));
       };
 
       const handleFrequencyChange = (newDays) => {
@@ -432,11 +306,7 @@
         const freqObj = FREQUENCIES.find((f) => f.days === newDays) || FREQUENCIES[1];
         const sportFactor = ex.id === "none" ? 0.0 : Number((ex.factor * freqObj.mult).toFixed(3));
         const combined = Number((daily.baseFactor + sportFactor).toFixed(3));
-        setProfile((prev) => ({
-          ...prev,
-          exerciseDays: newDays,
-          activity: combined
-        }));
+        setProfile((prev) => ({ ...prev, exerciseDays: newDays, activity: combined }));
       };
 
       const handleDailyActivityChange = (newDailyActivity) => {
@@ -445,11 +315,7 @@
         const freqObj = FREQUENCIES.find((f) => f.days === (profile.exerciseDays || 3)) || FREQUENCIES[1];
         const sportFactor = ex.id === "none" ? 0.0 : Number((ex.factor * freqObj.mult).toFixed(3));
         const combined = Number((daily.baseFactor + sportFactor).toFixed(3));
-        setProfile((prev) => ({
-          ...prev,
-          dailyActivity: newDailyActivity,
-          activity: combined
-        }));
+        setProfile((prev) => ({ ...prev, dailyActivity: newDailyActivity, activity: combined }));
       };
 
       const selectedExercise = EXERCISE_LEVELS.find((e) => e.id === (profile.exercise || "gym")) || EXERCISE_LEVELS[1];
@@ -459,7 +325,6 @@
       const calculateAutoGoals = () => {
         const { targetCals } = metabolicData;
         const w = Number(profile.weight) || 70;
-
         const targetProtein = Math.round(w * 2);
         const targetFat = Math.round((targetCals * 0.25) / 9);
         const targetCarbs = Math.max(Math.round((targetCals - (targetProtein * 4) - (targetFat * 9)) / 4), 0);
@@ -472,24 +337,81 @@
         });
       };
 
+      // =========================================================================
+      // COMPRESOR AUTOMÁTICO DE FOTOS PARA MÓVIL (Evita fallos por fotos pesadas)
+      // =========================================================================
+      const compressImage = (dataUrl, maxWidth = 800, quality = 0.75) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            if (width > maxWidth || height > maxWidth) {
+              if (width > height) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              } else {
+                width = Math.round((width * maxWidth) / height);
+                height = maxWidth;
+              }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          };
+          img.onerror = () => resolve(dataUrl);
+          img.src = dataUrl;
+        });
+      };
+
+      // =========================================================================
+      // CÁMARA CORREGIDA PARA MÓVILES Y PC
+      // =========================================================================
       const startCamera = async () => {
         setErrorMsg("");
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" }
-          });
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            setCameraActive(true);
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            if (nativeCameraInputRef.current) nativeCameraInputRef.current.click();
+            return;
           }
+          let stream;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: "environment" } },
+              audio: false
+            });
+          } catch (e) {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          }
+          streamRef.current = stream;
+          setCameraActive(true);
         } catch (err) {
-          setErrorMsg("No se pudo acceder a la cámara. Asegúrate de estar en HTTPS o usa el botón 'Subir Foto / Cámara Celular'.");
+          // Si el navegador móvil bloquea el visor web, abre la cámara nativa del teléfono automáticamente
+          if (nativeCameraInputRef.current) {
+            nativeCameraInputRef.current.click();
+          } else {
+            setErrorMsg("No se pudo abrir la cámara en vivo. Asegúrate de dar permiso de cámara al navegador.");
+          }
         }
       };
 
+      // Conecta el stream al elemento <video> una vez que ya existe en pantalla
+      useEffect(() => {
+        if (cameraActive && videoRef.current && streamRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          videoRef.current.play().catch(() => {});
+        }
+      }, [cameraActive]);
+
       const stopCamera = () => {
-        if (videoRef.current && videoRef.current.srcObject) {
-          videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
+        if (videoRef.current) {
           videoRef.current.srcObject = null;
         }
         setCameraActive(false);
@@ -499,27 +421,30 @@
         if (activeTab !== "camara") stopCamera();
       }, [activeTab]);
 
-      const capturePhoto = () => {
+      const capturePhoto = async () => {
         if (!videoRef.current || !canvasRef.current) return;
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        const rawDataUrl = canvas.toDataURL("image/jpeg", 0.85);
         stopCamera();
-        analyzeImageWithGemini(dataUrl);
+        const compressed = await compressImage(rawDataUrl);
+        analyzeImageWithGemini(compressed);
       };
 
       const handleFileUpload = (e) => {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onloadend = () => {
-          analyzeImageWithGemini(reader.result);
+        reader.onloadend = async () => {
+          const compressed = await compressImage(reader.result);
+          analyzeImageWithGemini(compressed);
         };
         reader.readAsDataURL(file);
+        e.target.value = ""; // Permite volver a subir la misma foto si se desea
       };
 
       const parseSafeJson = (rawText) => {
@@ -532,13 +457,16 @@
         return JSON.parse(cleaned);
       };
 
+      // =========================================================================
+      // LLAMADA A GEMINI SIN MODELOS OBSOLETOS (Solo serie 3.8 activa)
+      // =========================================================================
       const callGeminiWithRetry = async (contentsPayload) => {
+        const cleanCurrent = (modelName.includes("2.0") || modelName.includes("2.5")) ? MODELO_POR_DEFECTO : modelName;
         const fallbackModels = [
-          modelName,
+          cleanCurrent,
           "gemini-3.8-flash",
           "gemini-3.8-flash-lite",
-          "gemini-3.8-pro",
-          "gemini-2.0-flash"
+          "gemini-3.8-pro"
         ];
         const modelsToTry = [...new Set(fallbackModels)];
         let lastError = "";
@@ -550,7 +478,7 @@
             try {
               setStatusText(
                 attempt > 1
-                  ? `Servidor ocupado, reintentando con ${currentModel} (intento ${attempt})...`
+                  ? `Servidor ocupado, reintentando con ${currentModel} (${attempt}/2)...`
                   : `Analizando nutrientes con ${currentModel}...`
               );
 
@@ -612,7 +540,7 @@
           const base64String = base64DataUrl.split(",")[1];
           const mimeType = base64DataUrl.substring(base64DataUrl.indexOf(":") + 1, base64DataUrl.indexOf(";"));
 
-          const prompt = `Analiza esta imagen de comida. Identifica el plato o los ingredientes visibles, estima su tamaño de porción aproximado y calcula sus valores nutricionales totales.
+          const prompt = `Analiza esta imagen de comida o tabla nutricional. Identifica el plato o los ingredientes visibles, estima su tamaño de porción aproximado y calcula sus valores nutricionales totales.
 Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
 {
   "name": "Nombre descriptivo del plato en español",
@@ -694,7 +622,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
         setMeals(meals.filter(m => m.id !== id));
       };
 
-      // Filtrado para el buscador de alimentos
       const filteredFoods = useMemo(() => {
         return FOOD_DATABASE.filter(f => {
           const matchesQuery = searchQuery === "" || f.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -741,7 +668,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
             {/* VISTA 1: DIARIO */}
             {activeTab === "diario" && (
               <>
-                {/* BUSCADOR DE ALIMENTOS EXTENDIDO CON FRUTAS, VERDURAS Y UNIDADES */}
                 <div className="space-y-2">
                   <div className="relative">
                     <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
@@ -762,7 +688,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                     )}
                   </div>
 
-                  {/* Pills de categorías para explorar frutas, verduras, etc. */}
                   <div className="flex gap-1.5 overflow-x-auto pb-1 text-[11px] no-scrollbar">
                     {["Todos", "Frutas", "Verduras", "Proteínas", "Cereales", "Lácteos"].map((grp) => (
                       <button
@@ -780,7 +705,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                   </div>
                 </div>
 
-                {/* RESULTADOS DEL BUSCADOR O CATÁLOGO */}
                 {(searchQuery || selectedFoodGroup !== "Todos") && (
                   <div className="bg-slate-800 rounded-2xl p-3 border border-slate-700 space-y-2 max-h-64 overflow-y-auto">
                     <div className="flex justify-between items-center text-xs text-slate-400 font-medium px-1">
@@ -814,7 +738,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                   </div>
                 )}
 
-                {/* RESUMEN DEL DÍA / ANILLO DE CALORÍAS */}
                 <div className="bg-slate-800/60 border border-slate-800 rounded-3xl p-4 flex items-center justify-between gap-4 shadow-lg">
                   <div className="relative flex items-center justify-center">
                     <svg className="w-36 h-36 -rotate-90 transform">
@@ -933,7 +856,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                   <i className="fa-solid fa-camera text-2xl"></i>
                   <div className="text-left">
                     <span className="block text-base leading-none">Escanear Comida con IA</span>
-                    <span className="block text-xs font-medium opacity-80 mt-0.5">Tomar foto o describir para calcular</span>
+                    <span className="block text-xs font-medium opacity-80 mt-0.5">Tomar foto o subir desde tu galería</span>
                   </div>
                 </button>
               </>
@@ -964,39 +887,78 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                 </div>
 
                 <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-4 text-center space-y-3">
-                  {cameraActive ? (
-                    <div className="space-y-3">
-                      <video ref={videoRef} autoPlay playsInline className="w-full h-64 object-cover rounded-2xl bg-black" />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={capturePhoto}
-                          className="flex-1 bg-teal-400 text-slate-950 font-bold py-3 rounded-xl"
-                        >
-                          <i className="fa-solid fa-camera mr-2"></i>Capturar Foto
-                        </button>
-                        <button
-                          onClick={stopCamera}
-                          className="bg-slate-700 text-white px-4 py-3 rounded-xl"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
+                  {/* El video siempre existe en el DOM para que funcione en móviles sin fallar */}
+                  <div className={cameraActive ? "space-y-3 block" : "hidden"}>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-64 object-cover rounded-2xl bg-black border border-teal-500/40"
+                    />
+                    <div className="flex gap-2">
                       <button
-                        onClick={startCamera}
-                        className="bg-slate-900 hover:bg-slate-800 border border-slate-700 p-5 rounded-2xl flex flex-col items-center gap-2 transition"
+                        type="button"
+                        onClick={capturePhoto}
+                        className="flex-1 bg-teal-400 hover:bg-teal-300 text-slate-950 font-bold py-3 rounded-xl text-sm shadow-lg"
                       >
-                        <i className="fa-solid fa-camera text-3xl text-teal-400"></i>
-                        <span className="text-xs font-bold">Usar Cámara</span>
+                        <i className="fa-solid fa-camera mr-2"></i>Capturar Foto
                       </button>
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="bg-slate-700 text-white px-4 py-3 rounded-xl text-xs font-bold"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
 
-                      <label className="bg-slate-900 hover:bg-slate-800 border border-slate-700 p-5 rounded-2xl flex flex-col items-center gap-2 cursor-pointer transition">
-                        <i className="fa-solid fa-image text-3xl text-cyan-400"></i>
-                        <span className="text-xs font-bold">Subir Foto / Galería</span>
-                        <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} className="hidden" />
-                      </label>
+                  {!cameraActive && (
+                    <div className="space-y-2.5">
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* BOTÓN 1: USAR CÁMARA */}
+                        <button
+                          type="button"
+                          onClick={startCamera}
+                          className="bg-slate-900 hover:bg-slate-800 active:scale-95 border border-slate-700 p-5 rounded-2xl flex flex-col items-center gap-2 transition"
+                        >
+                          <i className="fa-solid fa-camera text-3xl text-teal-400"></i>
+                          <span className="text-xs font-bold">Usar Cámara</span>
+                          <span className="text-[10px] text-slate-400">Tomar foto ahora</span>
+                        </button>
+
+                        {/* BOTÓN 2: SUBIR FOTO O CAPTURA DESDE GALERÍA (Sin capture="environment") */}
+                        <label className="bg-slate-900 hover:bg-slate-800 active:scale-95 border border-slate-700 p-5 rounded-2xl flex flex-col items-center gap-2 cursor-pointer transition">
+                          <i className="fa-solid fa-images text-3xl text-cyan-400"></i>
+                          <span className="text-xs font-bold">Subir Foto / Galería</span>
+                          <span className="text-[10px] text-slate-400">Fotos o capturas</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      {/* Respaldo de cámara nativa para móviles si el navegador bloquea el visor en vivo */}
+                      <input
+                        ref={nativeCameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => nativeCameraInputRef.current && nativeCameraInputRef.current.click()}
+                        className="w-full py-2 px-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-400 hover:text-teal-300 flex items-center justify-center gap-1.5 transition"
+                      >
+                        <i className="fa-solid fa-mobile-screen-button text-teal-400"></i>
+                        <span>¿Estás en celular? Abrir app de Cámara del teléfono directamente</span>
+                      </button>
                     </div>
                   )}
                   <canvas ref={canvasRef} className="hidden" />
@@ -1138,7 +1100,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                   </div>
                 </div>
 
-                {/* Resumen de TMB y TDEE en estadísticas */}
                 <div className="bg-slate-800/40 border border-slate-800 rounded-2xl p-4 text-xs space-y-2">
                   <p className="text-slate-300 font-semibold"><i className="fa-solid fa-chart-pie mr-1.5 text-teal-400"></i>Balance Energético:</p>
                   <div className="flex justify-between text-slate-400">
@@ -1153,7 +1114,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
               </div>
             )}
 
-            {/* VISTA 4: PERFIL Y METAS (TMB Y TDEE EXACTOS) */}
+            {/* VISTA 4: PERFIL Y METAS */}
             {activeTab === "perfil" && (
               <div className="space-y-5">
                 <div>
@@ -1161,7 +1122,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                   <p className="text-xs text-slate-400">Calcula tus calorías con exactitud según tu cuerpo y nivel real de ejercicio.</p>
                 </div>
 
-                {/* CALCULADORA CIENTÍFICA TMB + TDEE */}
                 <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-4 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-700/60 pb-2">
                     <h3 className="font-bold text-sm text-teal-400 flex items-center gap-1.5">
@@ -1170,9 +1130,8 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                     </h3>
                   </div>
 
-                  {/* SELECTOR DE GÉNERO */}
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1.5 font-medium">Género </label>
+                    <label className="text-xs text-slate-400 block mb-1.5 font-medium">Género</label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
@@ -1183,7 +1142,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                             : "bg-slate-900 text-slate-300 border-slate-700"
                         }`}
                       >
-                        <i className="fa-solid fa-mars"></i>Hombre 
+                        <i className="fa-solid fa-mars"></i>Hombre
                       </button>
                       <button
                         type="button"
@@ -1194,12 +1153,11 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                             : "bg-slate-900 text-slate-300 border-slate-700"
                         }`}
                       >
-                        <i className="fa-solid fa-venus"></i>Mujer 
+                        <i className="fa-solid fa-venus"></i>Mujer
                       </button>
                     </div>
                   </div>
 
-                  {/* EDAD, PESO, ALTURA (CON AUTO-SELECCIÓN PARA QUE NO SE PEGUE EL CERO) */}
                   <div className="grid grid-cols-3 gap-2.5 text-xs">
                     <div>
                       <label className="text-slate-400 font-medium block">Edad (años)</label>
@@ -1236,9 +1194,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                     </div>
                   </div>
 
-                  {/* SELECTORES INDEPENDIENTES: 1. EJERCICIO O DEPORTE | 2. NIVEL DE ACTIVIDAD FÍSICA */}
                   <div className="space-y-3.5">
-                    {/* 1. PRIMER BOTÓN DESPLEGABLE: EJERCICIO O DEPORTE */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
@@ -1269,7 +1225,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                         {selectedExercise.desc}
                       </p>
 
-                      {/* SELECTOR DE FRECUENCIA SEMANAL DEL DEPORTE */}
                       {profile.exercise !== "none" && (
                         <div className="mt-2.5 pt-2.5 border-t border-slate-800/80">
                           <div className="flex items-center justify-between mb-1.5">
@@ -1301,7 +1256,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                       )}
                     </div>
 
-                    {/* 2. SEGUNDO BOTÓN DESPLEGABLE: NIVEL DE ACTIVIDAD FÍSICA */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
@@ -1333,7 +1287,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                       </p>
                     </div>
 
-                    {/* FACTOR COMBINADO DE ACTIVIDAD */}
                     <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex items-center justify-between text-xs">
                       <div>
                         <span className="text-slate-300 flex items-center gap-1.5 font-bold">
@@ -1355,7 +1308,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                     </div>
                   </div>
 
-                  {/* OBJETIVO NUTRICIONAL */}
                   <div className="space-y-3">
                     <div>
                       <label className="text-xs text-slate-400 font-medium block mb-1">Objetivo Físico:</label>
@@ -1370,7 +1322,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                       </select>
                     </div>
 
-                    {/* SELECTOR Y CALCULADORA DE PÉRDIDA DE GRASA POR SEMANA */}
                     {profile.objective === "deficit" && (
                       <div className="bg-slate-900/90 border border-teal-500/30 rounded-2xl p-3.5 space-y-3">
                         <div className="flex items-center justify-between gap-2">
@@ -1402,7 +1353,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                           </div>
                         </div>
 
-                        {/* BOTONES PREESTABLECIDOS RÁPIDOS */}
                         <div>
                           <span className="text-[10px] text-slate-400 font-semibold block mb-1.5">Ajuste rápido sugerido:</span>
                           <div className="grid grid-cols-4 gap-1.5">
@@ -1437,7 +1387,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                           </div>
                         </div>
 
-                        {/* RESUMEN EXPLICATIVO DEL DÉFICIT */}
                         <div className="bg-slate-950/80 rounded-xl p-2.5 border border-slate-800 text-xs space-y-1.5">
                           <div className="flex justify-between items-center">
                             <span className="text-slate-400 text-[11px]">Déficit Calórico Diario:</span>
@@ -1451,27 +1400,11 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                               -{Math.round(metabolicData.deficitDaily * 7)} kcal/sem
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-500 pt-0.5 leading-tight">
-                            *Cálculo metabólico: 1 kg de grasa corporal almacenada equivale a aprox. 7,700 kcal.
-                          </p>
-
-                          {/* ALERTA DE SEGURIDAD */}
-                          {(Number(profile.weeklyLossKg) > 1.0 || (metabolicData.targetCals < 1200 && metabolicData.targetCals > 0)) && (
-                            <div className="mt-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-300 flex items-start gap-1.5 leading-tight">
-                              <span>⚠️</span>
-                              <span>
-                                {Number(profile.weeklyLossKg) > 1.0
-                                  ? "Perder más de 1 kg/semana es un déficit muy agresivo y aumenta el riesgo de perder masa muscular. Se recomienda 0.25 a 0.75 kg/sem."
-                                  : "Tus calorías resultantes están por debajo de 1200 kcal/día. Considera un ritmo de pérdida más gradual para preservar tu salud."}
-                              </span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* EXPLICACIÓN DIDÁCTICA Y RESULTADOS EN VIVO DE TMB Y TDEE */}
                   <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800">
@@ -1510,7 +1443,6 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                   </div>
                 </div>
 
-                {/* METAS DIARIAS ACTIVAS (EDITABLES SIN PROBLEMA DEL CERO) */}
                 <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-4 space-y-3">
                   <h3 className="font-bold text-sm text-white">Metas Diarias Actuales</h3>
                   <div className="grid grid-cols-2 gap-3 text-xs">
@@ -1593,7 +1525,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
                     id="model-input"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-teal-300 font-mono focus:outline-none focus:border-teal-400"
                   />
-                  <p className="text-[11px] text-slate-500">Incluye respaldo automático si hay alta demanda.</p>
+                  <p className="text-[11px] text-slate-500">Por defecto: <code>gemini-3.8-flash</code></p>
                 </div>
 
                 <div className="flex gap-2">
